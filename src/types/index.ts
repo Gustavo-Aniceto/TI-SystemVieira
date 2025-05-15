@@ -1,0 +1,103 @@
+export interface User {
+  id: string;
+  username: string;
+  password: string;
+  name: string;
+  role: 'admin' | 'user' | 'intern';
+  email: string;
+  createdAt: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  description: string;
+  categoryId: string;
+  quantity: number;
+  minQuantity: number;
+  status: 'active' | 'inactive' | 'maintenance';
+  serialNumber?: string;
+  location?: string;
+  department?: string;
+  branch?: string;
+  purchaseDate?: string;
+  warrantyEnd?: string;
+  lifecycleStatus: 'new' | 'in-use' | 'maintenance' | 'disposed';
+  notes?: string;
+  createdAt: string;
+  maintenanceHistory: MaintenanceRecord[];
+  movementHistory: MovementRecord[];
+  licenseExpiration?: string;
+}
+
+export interface MaintenanceRecord {
+  id: string;
+  date: string;
+  description: string;
+  cost?: number;
+  provider?: string;
+  status: 'completed' | 'pending' | 'scheduled';
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface MovementRecord {
+  id: string;
+  date: string;
+  type: 'check-out' | 'check-in' | 'transfer';
+  userId: string;
+  fromLocation?: string;
+  toLocation?: string;
+  reason?: string;
+  expectedReturnDate?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  type: 'subscription' | 'task' | 'reminder' | 'maintenance' | 'license';
+  relatedProductId?: string;
+  color?: string;
+  createdAt: string;
+}
+
+export interface InternActivity {
+  id: string;
+  internId: string;
+  date: string;
+  description: string;
+  category: 'maintenance' | 'support' | 'inventory' | 'other';
+  hours: number;
+  status: 'pending' | 'approved' | 'rejected';
+  feedback?: string;
+  createdAt: string;
+}
+
+export interface ReportFilter {
+  categoryId?: string;
+  status?: string;
+  lowStock?: boolean;
+  startDate?: string;
+  endDate?: string;
+  type?: string;
+  location?: string;
+  department?: string;
+  branch?: string;
+  lifecycleStatus?: string;
+  internId?: string;
+  activityCategory?: string;
+  activityStatus?: string;
+}
