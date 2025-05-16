@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Category, Product, CalendarEvent, User } from '../types';
+import { Category, Product, CalendarEvent, User, InternActivity, MovementRecord } from '../types';
 import { generateExcel } from '../utils/excelUtils';
 import toast from 'react-hot-toast';
 
@@ -17,6 +17,9 @@ interface DataContextType {
   deleteProduct: (id: string) => void;
   getLowStockProducts: () => Product[];
   
+  // Product Movements
+  addMovement: (productId: string, movement: Omit<MovementRecord, 'id' | 'createdAt'>) => void;
+  
   // Calendar
   events: CalendarEvent[];
   addEvent: (event: Omit<CalendarEvent, 'id'>) => void;
@@ -28,6 +31,12 @@ interface DataContextType {
   addUser: (user: Omit<User, 'id' | 'createdAt'>) => void;
   updateUser: (id: string, user: Partial<User>) => void;
   deleteUser: (id: string) => void;
+  
+  // Intern Activities
+  activities: InternActivity[];
+  addActivity: (activity: Omit<InternActivity, 'id' | 'createdAt'>) => void;
+  updateActivity: (id: string, activity: Partial<InternActivity>) => void;
+  deleteActivity: (id: string) => void;
   
   // Reports
   generateReport: (type: string, filters: any) => void;
@@ -42,6 +51,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [products, setProducts] = useState<Product[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [activities, setActivities] = useState<InternActivity[]>([]);
 
   // Load initial data
   useEffect(() => {
@@ -80,15 +90,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Initialize with default admin user
       const defaultUser = {
         id: '1',
-        username: 'Gustavo',
-        password: '1234',
-        name: 'Gustavo',
+        username: 'admin',
+        password: 'admin',
+        name: 'Administrador',
         role: 'admin',
-        email: 'admin@anicetoevieira.com',
+        email: 'admin@example.com',
         createdAt: new Date().toISOString()
       };
       setUsers([defaultUser]);
       localStorage.setItem('users', JSON.stringify([defaultUser]));
+    }
+
+    // Load activities
+    const storedActivities = localStorage.getItem('activities');
+    if (storedActivities) {
+      setActivities(JSON.parse(storedActivities));
     }
   }, []);
 
@@ -116,6 +132,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('users', JSON.stringify(users));
     }
   }, [users]);
+
+  useEffect(() => {
+    if (activities.length > 0) {
+      localStorage.setItem('activities', JSON.stringify(activities));
+    }
+  }, [activities]);
 
   // Category operations
   const addCategory = (category: Omit<Category, 'id'>) => {
@@ -155,7 +177,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const newProduct = {
       ...product,
       id: Date.now().toString(),
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      maintenanceHistory: [],
+      movementHistory: []
     };
     setProducts([...products, newProduct]);
     toast.success('Produto adicionado com sucesso!');
@@ -192,6 +216,36 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const getLowStockProducts = () => {
     return products.filter(product => product.quantity <= product.minQuantity);
+  };
+
+  // Product Movement operations
+  const addMovement = (productId: string, movement: Omit<MovementRecord, 'id' | 'createdAt'>) => {
+    const newMovement = {
+      ...movement,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString()
+    };
+
+    setProducts(products.map(product => {
+      if (product.id === productId) {
+        const updatedProduct = {
+          ...product,
+          movementHistory: [...product.movementHistory, newMovement]
+        };
+
+        // Update quantity based on movement type
+        if (movement.type === 'check-out') {
+          updatedProduct.quantity -= 1;
+        } else if (movement.type === 'check-in') {
+          updatedProduct.quantity += 1;
+        }
+
+        return updatedProduct;
+      }
+      return product;
+    }));
+
+    toast.success('Movimentação registrada com sucesso!');
   };
 
   // Calendar operations
@@ -253,6 +307,31 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     toast.success('Usuário excluído com sucesso!');
   };
 
+  // Intern Activity operations
+  const addActivity = (activity: Omit<InternActivity, 'id' | 'createdAt'>) => {
+    const newActivity = {
+      ...activity,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString()
+    };
+    setActivities([...activities, newActivity]);
+    toast.success('Atividade registrada com sucesso!');
+  };
+
+  const updateActivity = (id: string, activityUpdate: Partial<InternActivity>) => {
+    setActivities(
+      activities.map(activity => 
+        activity.id === id ? { ...activity, ...activityUpdate } : activity
+      )
+    );
+    toast.success('Atividade atualizada com sucesso!');
+  };
+
+  const deleteActivity = (id: string) => {
+    setActivities(activities.filter(activity => activity.id !== id));
+    toast.success('Atividade excluída com sucesso!');
+  };
+
   // Reports
   const generateReport = (type: string, filters: any) => {
     let data: any[] = [];
@@ -283,24 +362,56 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         columns = ['ID', 'Nome', 'Categoria', 'Quantidade', 'Quantidade Mínima', 'Status', 'Data de Criação'];
         break;
         
-      case 'categories':
-        data = categories;
-        columns = ['ID', 'Nome', 'Descrição', 'Data de Criação'];
-        break;
+      case 'movements':
+        data = products.flatMap(product => 
+          product.movementHistory.map(movement => ({
+            ...movement,
+            productName: product.name,
+            userName: users.find(u => u.id === movement.userId)?.name || 'Usuário Removido'
+          }))
+        );
         
-      case 'events':
-        data = events;
         if (filters.startDate) {
-          data = data.filter(event => new Date(event.startDate) >= new Date(filters.startDate));
+          data = data.filter(movement => new Date(movement.date) >= new Date(filters.startDate));
         }
         if (filters.endDate) {
-          data = data.filter(event => new Date(event.endDate) <= new Date(filters.endDate));
+          data = data.filter(movement => new Date(movement.date) <= new Date(filters.endDate));
         }
         if (filters.type) {
-          data = data.filter(event => event.type === filters.type);
+          data = data.filter(movement => movement.type === filters.type);
         }
         
-        columns = ['ID', 'Título', 'Tipo', 'Data de Início', 'Data de Término', 'Descrição', 'Data de Criação'];
+        columns = ['ID', 'Produto', 'Tipo', 'Usuário', 'De', 'Para', 'Data', 'Motivo', 'Retorno Previsto'];
+        break;
+        
+      case 'internActivities':
+        data = activities;
+        if (filters.internId) {
+          data = data.filter(activity => activity.internId === filters.internId);
+        }
+        if (filters.category) {
+          data = data.filter(activity => activity.category === filters.category);
+        }
+        if (filters.status) {
+          data = data.filter(activity => activity.status === filters.status);
+        }
+        if (filters.startDate) {
+          data = data.filter(activity => new Date(activity.date) >= new Date(filters.startDate));
+        }
+        if (filters.endDate) {
+          data = data.filter(activity => new Date(activity.date) <= new Date(filters.endDate));
+        }
+        
+        // Enrich data with intern names
+        data = data.map(activity => {
+          const intern = users.find(u => u.id === activity.internId);
+          return {
+            ...activity,
+            internName: intern ? intern.name : 'Usuário Removido'
+          };
+        });
+        
+        columns = ['ID', 'Estagiário', 'Data', 'Categoria', 'Descrição', 'Horas', 'Status', 'Feedback'];
         break;
         
       default:
@@ -326,6 +437,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deleteProduct,
         getLowStockProducts,
         
+        addMovement,
+        
         events,
         addEvent,
         updateEvent,
@@ -335,6 +448,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addUser,
         updateUser,
         deleteUser,
+        
+        activities,
+        addActivity,
+        updateActivity,
+        deleteActivity,
         
         generateReport
       }}
