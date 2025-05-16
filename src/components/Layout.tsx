@@ -17,30 +17,32 @@ import {
 import toast from 'react-hot-toast';
 
 const Layout = () => {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, isIntern } = useAuth();
   const { getLowStockProducts } = useData();
   const location = useLocation();
   const navigate = useNavigate();
   
   // Check for low stock products on initial load
   useEffect(() => {
-    const lowStockProducts = getLowStockProducts();
-    if (lowStockProducts.length > 0) {
-      toast.error(
-        <div>
-          <strong>Alerta de Estoque Baixo!</strong>
-          <p>{lowStockProducts.length} produto(s) com estoque baixo</p>
-          <button 
-            className="text-blue-500 underline"
-            onClick={() => navigate('/products?filter=lowstock')}
-          >
-            Ver detalhes
-          </button>
-        </div>,
-        { duration: 5000 }
-      );
+    if (isAdmin) {
+      const lowStockProducts = getLowStockProducts();
+      if (lowStockProducts.length > 0) {
+        toast.error(
+          <div>
+            <strong>Alerta de Estoque Baixo!</strong>
+            <p>{lowStockProducts.length} produto(s) com estoque baixo</p>
+            <button 
+              className="text-blue-500 underline"
+              onClick={() => navigate('/products?filter=lowstock')}
+            >
+              Ver detalhes
+            </button>
+          </div>,
+          { duration: 5000 }
+        );
+      }
     }
-  }, [getLowStockProducts, navigate]);
+  }, [getLowStockProducts, navigate, isAdmin]);
 
   const handleLogout = () => {
     logout();
@@ -76,12 +78,18 @@ const Layout = () => {
         
         <nav className="flex-1 space-y-1">
           <NavItem to="/" icon={<LayoutGrid size={20} />} label="Dashboard" />
-          <NavItem to="/categories" icon={<Layers size={20} />} label="Categorias" />
-          <NavItem to="/products" icon={<Package size={20} />} label="Produtos" />
+          {!isIntern && (
+            <>
+              <NavItem to="/categories" icon={<Layers size={20} />} label="Categorias" />
+              <NavItem to="/products" icon={<Package size={20} />} label="Produtos" />
+            </>
+          )}
           <NavItem to="/calendar" icon={<CalendarIcon size={20} />} label="Calendário" />
-          <NavItem to="/reports" icon={<FileText size={20} />} label="Relatórios" />
+          {!isIntern && (
+            <NavItem to="/reports" icon={<FileText size={20} />} label="Relatórios" />
+          )}
           {isAdmin && <NavItem to="/users" icon={<Users size={20} />} label="Usuários" />}
-          {user?.role === 'intern' && (
+          {isIntern && (
             <NavItem to="/intern-activities" icon={<ClipboardList size={20} />} label="Minhas Atividades" />
           )}
           {isAdmin && (

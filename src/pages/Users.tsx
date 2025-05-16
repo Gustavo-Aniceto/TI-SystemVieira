@@ -8,7 +8,7 @@ interface UserFormData {
   password: string;
   name: string;
   email: string;
-  role: 'admin' | 'user';
+  role: 'admin' | 'user' | 'intern';
 }
 
 const Users = () => {
@@ -156,6 +156,8 @@ const Users = () => {
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       user.role === 'admin'
                         ? 'bg-purple-100 text-purple-800'
+                        : user.role === 'intern'
+                        ? 'bg-green-100 text-green-800'
                         : 'bg-gray-100 text-gray-800'
                     }`}>
                       {user.role === 'admin' ? (
@@ -163,7 +165,7 @@ const Users = () => {
                           <ShieldAlert className="w-3 h-3 mr-1" />
                           Administrador
                         </>
-                      ) : 'Usuário'}
+                      ) : user.role === 'intern' ? 'Estagiário' : 'Usuário'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -284,6 +286,7 @@ const Users = () => {
                   >
                     <option value="user">Usuário</option>
                     <option value="admin">Administrador</option>
+                    <option value="intern">Estagiário</option>
                   </select>
                 </div>
               </div>

@@ -6,6 +6,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   isAdmin: boolean;
+  isIntern: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -13,6 +14,7 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => false,
   logout: () => {},
   isAdmin: false,
+  isIntern: false,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -20,6 +22,7 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [isIntern, setIsIntern] = useState<boolean>(false);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -27,6 +30,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const parsedUser = JSON.parse(storedUser);
       setUser(parsedUser);
       setIsAdmin(parsedUser.role === 'admin');
+      setIsIntern(parsedUser.role === 'intern');
     }
   }, []);
 
@@ -39,11 +43,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (users.length === 0) {
       const defaultAdmin = {
         id: '1',
-        username: 'Gustavo',
-        password: '1234',
-        name: 'Gustavo',
+        username: 'admin',
+        password: 'admin',
+        name: 'Administrador',
         role: 'admin',
-        email: 'admin@anicetoevieira.com',
+        email: 'admin@example.com',
         createdAt: new Date().toISOString(),
       };
       
@@ -58,6 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (foundUser) {
       setUser(foundUser);
       setIsAdmin(foundUser.role === 'admin');
+      setIsIntern(foundUser.role === 'intern');
       localStorage.setItem('user', JSON.stringify(foundUser));
       return true;
     }
@@ -68,11 +73,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     setUser(null);
     setIsAdmin(false);
+    setIsIntern(false);
     localStorage.removeItem('user');
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAdmin }}>
+    <AuthContext.Provider value={{ user, login, logout, isAdmin, isIntern }}>
       {children}
     </AuthContext.Provider>
   );
