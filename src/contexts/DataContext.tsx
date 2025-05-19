@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Category, Product, CalendarEvent, User, InternActivity, MovementRecord } from '../types';
+import { Category, Product, CalendarEvent, User, InternActivity, MovementRecord, Note, ChecklistItem } from '../types';
 import { generateExcel } from '../utils/excelUtils';
 import toast from 'react-hot-toast';
 
@@ -38,6 +38,12 @@ interface DataContextType {
   updateActivity: (id: string, activity: Partial<InternActivity>) => void;
   deleteActivity: (id: string) => void;
   
+  // Notes
+  notes: Note[];
+  addNote: (note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateNote: (id: string, note: Partial<Note>) => void;
+  deleteNote: (id: string) => void;
+  
   // Reports
   generateReport: (type: string, filters: any) => void;
 }
@@ -52,6 +58,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [activities, setActivities] = useState<InternActivity[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
 
   // Load initial data
   useEffect(() => {
@@ -106,6 +113,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (storedActivities) {
       setActivities(JSON.parse(storedActivities));
     }
+
+    // Load notes
+    const storedNotes = localStorage.getItem('notes');
+    if (storedNotes) {
+      setNotes(JSON.parse(storedNotes));
+    }
   }, []);
 
   // Save data whenever it changes
@@ -138,6 +151,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('activities', JSON.stringify(activities));
     }
   }, [activities]);
+
+  useEffect(() => {
+    if (notes.length > 0) {
+      localStorage.setItem('notes', JSON.stringify(notes));
+    }
+  }, [notes]);
 
   // Category operations
   const addCategory = (category: Omit<Category, 'id'>) => {
@@ -332,6 +351,39 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     toast.success('Atividade excluída com sucesso!');
   };
 
+  // Notes operations
+  const addNote = (note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const now = new Date().toISOString();
+    const newNote = {
+      ...note,
+      id: Date.now().toString(),
+      createdAt: now,
+      updatedAt: now
+    };
+    setNotes([...notes, newNote]);
+    toast.success('Anotação criada com sucesso!');
+  };
+
+  const updateNote = (id: string, noteUpdate: Partial<Note>) => {
+    setNotes(
+      notes.map(note => 
+        note.id === id 
+          ? { 
+              ...note, 
+              ...noteUpdate, 
+              updatedAt: new Date().toISOString() 
+            } 
+          : note
+      )
+    );
+    toast.success('Anotação atualizada com sucesso!');
+  };
+
+  const deleteNote = (id: string) => {
+    setNotes(notes.filter(note => note.id !== id));
+    toast.success('Anotação excluída com sucesso!');
+  };
+
   // Reports
   const generateReport = (type: string, filters: any) => {
     let data: any[] = [];
@@ -413,6 +465,34 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         columns = ['ID', 'Estagiário', 'Data', 'Categoria', 'Descrição', 'Horas', 'Status', 'Feedback'];
         break;
+
+      case 'notes':
+        data = notes;
+        if (filters.userId) {
+          data = data.filter(note => note.userId === filters.userId || note.isPublic);
+        }
+        if (filters.type) {
+          data = data.filter(note => note.type === filters.type);
+        }
+        if (filters.startDate) {
+          data = data.filter(note => new Date(note.createdAt) >= new Date(filters.startDate));
+        }
+        if (filters.endDate) {
+          data = data.filter(note => new Date(note.createdAt) <= new Date(filters.endDate));
+        }
+
+        // Enrich data with user names
+        data = data.map(note => {
+          const noteUser = users.find(u => u.id === note.userId);
+          return {
+            ...note,
+            userName: noteUser ? noteUser.name : 'Usuário Removido',
+            visibility: note.isPublic ? 'Pública' : 'Privada'
+          };
+        });
+
+        columns = ['ID', 'Título', 'Conteúdo', 'Tipo', 'Usuário', 'Visibilidade', 'Criado em', 'Atualizado em'];
+        break;
         
       default:
         toast.error('Tipo de relatório inválido');
@@ -453,6 +533,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addActivity,
         updateActivity,
         deleteActivity,
+        
+        notes,
+        addNote,
+        updateNote,
+        deleteNote,
         
         generateReport
       }}

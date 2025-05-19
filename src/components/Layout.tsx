@@ -12,7 +12,8 @@ import {
   LogOut,
   AlertTriangle,
   ClipboardList,
-  UserCheck
+  UserCheck,
+  StickyNote
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -85,6 +86,7 @@ const Layout = () => {
             </>
           )}
           <NavItem to="/calendar" icon={<CalendarIcon size={20} />} label="Calendário" />
+          <NavItem to="/notes" icon={<StickyNote size={20} />} label="Anotações" />
           {!isIntern && (
             <NavItem to="/reports" icon={<FileText size={20} />} label="Relatórios" />
           )}

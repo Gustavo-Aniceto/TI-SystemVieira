@@ -11,6 +11,7 @@ import Reports from './pages/Reports';
 import Users from './pages/Users';
 import InternActivities from './pages/InternActivities';
 import InternReview from './pages/InternReview';
+import Notes from './pages/Notes';
 import NotFound from './pages/NotFound';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DataProvider } from './contexts/DataContext';
@@ -47,6 +48,7 @@ function App() {
               <Route path="products" element={<Products />} />
               <Route path="calendar" element={<Calendar />} />
               <Route path="reports" element={<Reports />} />
+              <Route path="notes" element={<Notes />} />
               <Route path="users" element={
                 <ProtectedRoute roles={['admin']}>
                   <Users />

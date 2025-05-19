@@ -86,6 +86,26 @@ export interface InternActivity {
   createdAt: string;
 }
 
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  type: 'note' | 'checklist';
+  color?: string;
+  isPublic: boolean;
+  userId: string;
+  checklistItems?: ChecklistItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+  createdAt: string;
+}
+
 export interface ReportFilter {
   categoryId?: string;
   status?: string;
