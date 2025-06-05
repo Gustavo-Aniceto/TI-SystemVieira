@@ -3,7 +3,7 @@ export interface User {
   username: string;
   password: string;
   name: string;
-  role: 'admin' | 'user' | 'intern';
+  role: 'admin' | 'user' | 'intern' | 'supervisor';
   email: string;
   createdAt: string;
 }
@@ -103,6 +103,29 @@ export interface ChecklistItem {
   id: string;
   text: string;
   completed: boolean;
+  createdAt: string;
+}
+
+export interface Ticket {
+  id: string;
+  problem: string;
+  supervisor: string;
+  operator: string;
+  company: string;
+  anydeskAccess: string;
+  status: 'open' | 'in-progress' | 'resolved' | 'closed';
+  createdBy: string;
+  assignedTo?: string;
+  comments: TicketComment[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TicketComment {
+  id: string;
+  ticketId: string;
+  userId: string;
+  content: string;
   createdAt: string;
 }
 

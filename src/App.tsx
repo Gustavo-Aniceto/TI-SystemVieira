@@ -12,6 +12,7 @@ import Users from './pages/Users';
 import InternActivities from './pages/InternActivities';
 import InternReview from './pages/InternReview';
 import Notes from './pages/Notes';
+import Tickets from './pages/Tickets';
 import NotFound from './pages/NotFound';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DataProvider } from './contexts/DataContext';
@@ -44,11 +45,24 @@ function App() {
               </ProtectedRoute>
             }>
               <Route index element={<Dashboard />} />
-              <Route path="categories" element={<Categories />} />
-              <Route path="products" element={<Products />} />
+              <Route path="categories" element={
+                <ProtectedRoute roles={['admin', 'user']}>
+                  <Categories />
+                </ProtectedRoute>
+              } />
+              <Route path="products" element={
+                <ProtectedRoute roles={['admin', 'user']}>
+                  <Products />
+                </ProtectedRoute>
+              } />
               <Route path="calendar" element={<Calendar />} />
-              <Route path="reports" element={<Reports />} />
+              <Route path="reports" element={
+                <ProtectedRoute roles={['admin']}>
+                  <Reports />
+                </ProtectedRoute>
+              } />
               <Route path="notes" element={<Notes />} />
+              <Route path="tickets" element={<Tickets />} />
               <Route path="users" element={
                 <ProtectedRoute roles={['admin']}>
                   <Users />

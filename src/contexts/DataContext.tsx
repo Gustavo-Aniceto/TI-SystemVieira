@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Category, Product, CalendarEvent, User, InternActivity, MovementRecord, Note, ChecklistItem } from '../types';
+import { Category, Product, CalendarEvent, User, InternActivity, MovementRecord, Note, ChecklistItem, Ticket, TicketComment } from '../types';
 import { generateExcel } from '../utils/excelUtils';
 import toast from 'react-hot-toast';
 
@@ -46,6 +46,13 @@ interface DataContextType {
   
   // Reports
   generateReport: (type: string, filters: any) => void;
+
+  // Tickets
+  tickets: Ticket[];
+  addTicket: (ticket: Omit<Ticket, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'status'>) => void;
+  updateTicket: (id: string, ticket: Partial<Ticket>) => void;
+  deleteTicket: (id: string) => void;
+  addTicketComment: (ticketId: string, comment: Omit<TicketComment, 'id' | 'createdAt'>) => void;
 }
 
 const DataContext = createContext<DataContextType>({} as DataContextType);
@@ -59,6 +66,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [users, setUsers] = useState<User[]>([]);
   const [activities, setActivities] = useState<InternActivity[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
 
   // Load initial data
   useEffect(() => {
@@ -119,6 +127,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (storedNotes) {
       setNotes(JSON.parse(storedNotes));
     }
+
+    // Load tickets
+    const storedTickets = localStorage.getItem('tickets');
+    if (storedTickets) {
+      setTickets(JSON.parse(storedTickets));
+    }
   }, []);
 
   // Save data whenever it changes
@@ -157,6 +171,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('notes', JSON.stringify(notes));
     }
   }, [notes]);
+
+  useEffect(() => {
+    if (tickets.length > 0) {
+      localStorage.setItem('tickets', JSON.stringify(tickets));
+    }
+  }, [tickets]);
 
   // Category operations
   const addCategory = (category: Omit<Category, 'id'>) => {
@@ -384,6 +404,62 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     toast.success('Anotação excluída com sucesso!');
   };
 
+  // Ticket operations
+  const addTicket = (ticket: Omit<Ticket, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'status'>) => {
+    const now = new Date().toISOString();
+    const newTicket = {
+      ...ticket,
+      id: Date.now().toString(),
+      status: 'open',
+      comments: [],
+      createdAt: now,
+      updatedAt: now
+    };
+    setTickets([...tickets, newTicket]);
+    toast.success('Chamado criado com sucesso!');
+  };
+
+  const updateTicket = (id: string, ticketUpdate: Partial<Ticket>) => {
+    setTickets(
+      tickets.map(ticket =>
+        ticket.id === id
+          ? {
+              ...ticket,
+              ...ticketUpdate,
+              updatedAt: new Date().toISOString()
+            }
+          : ticket
+      )
+    );
+    toast.success('Chamado atualizado com sucesso!');
+  };
+
+  const deleteTicket = (id: string) => {
+    setTickets(tickets.filter(ticket => ticket.id !== id));
+    toast.success('Chamado excluído com sucesso!');
+  };
+
+  const addTicketComment = (ticketId: string, comment: Omit<TicketComment, 'id' | 'createdAt'>) => {
+    const newComment = {
+      ...comment,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString()
+    };
+
+    setTickets(
+      tickets.map(ticket =>
+        ticket.id === ticketId
+          ? {
+              ...ticket,
+              comments: [...ticket.comments, newComment],
+              updatedAt: new Date().toISOString()
+            }
+          : ticket
+      )
+    );
+    toast.success('Comentário adicionado com sucesso!');
+  };
+
   // Reports
   const generateReport = (type: string, filters: any) => {
     let data: any[] = [];
@@ -539,7 +615,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateNote,
         deleteNote,
         
-        generateReport
+        generateReport,
+
+        tickets,
+        addTicket,
+        updateTicket,
+        deleteTicket,
+        addTicketComment
       }}
     >
       {children}
