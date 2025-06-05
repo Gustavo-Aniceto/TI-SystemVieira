@@ -13,12 +13,13 @@ import {
   AlertTriangle,
   ClipboardList,
   UserCheck,
-  StickyNote
+  StickyNote,
+  Ticket
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Layout = () => {
-  const { user, logout, isAdmin, isIntern } = useAuth();
+  const { user, logout, isAdmin, isIntern, isSupervisor } = useAuth();
   const { getLowStockProducts } = useData();
   const location = useLocation();
   const navigate = useNavigate();
@@ -70,7 +71,6 @@ const Layout = () => {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
       <aside className="w-64 bg-white border-r border-gray-200 p-4 flex flex-col">
         <div className="py-4 border-b border-gray-200 mb-6">
           <h1 className="text-xl font-bold text-blue-600">Aniceto&Vieira</h1>
@@ -78,16 +78,17 @@ const Layout = () => {
         </div>
         
         <nav className="flex-1 space-y-1">
-          <NavItem to="/" icon={<LayoutGrid size={20} />} label="Dashboard" />
-          {!isIntern && (
+          {!isSupervisor && <NavItem to="/" icon={<LayoutGrid size={20} />} label="Dashboard" />}
+          {!isIntern && !isSupervisor && (
             <>
               <NavItem to="/categories" icon={<Layers size={20} />} label="Categorias" />
               <NavItem to="/products" icon={<Package size={20} />} label="Produtos" />
             </>
           )}
           <NavItem to="/calendar" icon={<CalendarIcon size={20} />} label="Calendário" />
+          <NavItem to="/tickets" icon={<Ticket size={20} />} label="Chamados" />
           <NavItem to="/notes" icon={<StickyNote size={20} />} label="Anotações" />
-          {!isIntern && (
+          {!isIntern && !isSupervisor && (
             <NavItem to="/reports" icon={<FileText size={20} />} label="Relatórios" />
           )}
           {isAdmin && <NavItem to="/users" icon={<Users size={20} />} label="Usuários" />}
@@ -99,12 +100,13 @@ const Layout = () => {
           )}
         </nav>
         
-        <div className="pt-4 mt-auto border-t border-gray-200">
+        <div className="pt-4  mt-auto border-t border-gray-200">
           <div className="px-4 py-2">
             <p className="text-sm font-medium text-gray-900">{user?.name}</p>
             <p className="text-xs text-gray-500">
               {user?.role === 'admin' ? 'Administrador' : 
-               user?.role === 'intern' ? 'Estagiário' : 'Usuário'}
+               user?.role === 'intern' ? 'Estagiário' :
+               user?.role === 'supervisor' ? 'Supervisor' : 'Usuário'}
             </p>
           </div>
           <button
@@ -117,7 +119,6 @@ const Layout = () => {
         </div>
       </aside>
       
-      {/* Main content */}
       <main className="flex-1 overflow-auto p-8">
         <Outlet />
       </main>
