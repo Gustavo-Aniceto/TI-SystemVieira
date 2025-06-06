@@ -7,6 +7,7 @@ interface AuthContextType {
   logout: () => void;
   isAdmin: boolean;
   isIntern: boolean;
+  isSupervisor: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -15,6 +16,7 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
   isAdmin: false,
   isIntern: false,
+  isSupervisor: false,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -23,6 +25,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [isIntern, setIsIntern] = useState<boolean>(false);
+  const [isSupervisor, setIsSupervisor] = useState<boolean>(false);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -31,6 +34,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(parsedUser);
       setIsAdmin(parsedUser.role === 'admin');
       setIsIntern(parsedUser.role === 'intern');
+      setIsSupervisor(parsedUser.role === 'supervisor');
     }
   }, []);
 
@@ -63,6 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(foundUser);
       setIsAdmin(foundUser.role === 'admin');
       setIsIntern(foundUser.role === 'intern');
+      setIsSupervisor(foundUser.role === 'supervisor');
       localStorage.setItem('user', JSON.stringify(foundUser));
       return true;
     }
@@ -74,11 +79,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setIsAdmin(false);
     setIsIntern(false);
+    setIsSupervisor(false);
     localStorage.removeItem('user');
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAdmin, isIntern }}>
+    <AuthContext.Provider value={{ user, login, logout, isAdmin, isIntern, isSupervisor }}>
       {children}
     </AuthContext.Provider>
   );

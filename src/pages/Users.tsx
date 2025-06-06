@@ -8,7 +8,7 @@ interface UserFormData {
   password: string;
   name: string;
   email: string;
-  role: 'admin' | 'user' | 'intern';
+  role: 'admin' | 'user' | 'intern' | 'supervisor';
 }
 
 const Users = () => {
@@ -94,6 +94,34 @@ const Users = () => {
     }
   };
 
+  const getRoleDisplay = (role: string) => {
+    switch (role) {
+      case 'admin':
+        return 'Administrador';
+      case 'user':
+        return 'Usuário';
+      case 'intern':
+        return 'Estagiário';
+      case 'supervisor':
+        return 'Supervisor';
+      default:
+        return role;
+    }
+  };
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'admin':
+        return 'bg-purple-100 text-purple-800';
+      case 'supervisor':
+        return 'bg-orange-100 text-orange-800';
+      case 'intern':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -153,19 +181,9 @@ const Users = () => {
                     <div className="text-sm text-gray-500">{user.email}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      user.role === 'admin'
-                        ? 'bg-purple-100 text-purple-800'
-                        : user.role === 'intern'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {user.role === 'admin' ? (
-                        <>
-                          <ShieldAlert className="w-3 h-3 mr-1" />
-                          Administrador
-                        </>
-                      ) : user.role === 'intern' ? 'Estagiário' : 'Usuário'}
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(user.role)}`}>
+                      {user.role === 'admin' && <ShieldAlert className="w-3 h-3 mr-1" />}
+                      {getRoleDisplay(user.role)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -286,6 +304,7 @@ const Users = () => {
                   >
                     <option value="user">Usuário</option>
                     <option value="admin">Administrador</option>
+                    <option value="supervisor">Supervisor</option>
                     <option value="intern">Estagiário</option>
                   </select>
                 </div>
