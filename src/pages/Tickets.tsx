@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Ticket, MessageSquare, Plus, Edit, Trash2, X, Filter, Send, FileText, Clock, CheckCircle } from 'lucide-react';
+import { Ticket, MessageSquare, Plus, Edit, Trash2, X, Filter, Send, FileText, Clock, CheckCircle, User, AlertCircle } from 'lucide-react';
 
 interface TicketFormData {
   problem: string;
@@ -11,13 +11,19 @@ interface TicketFormData {
   anydeskAccess: string;
 }
 
+interface FeedbackFormData {
+  feedback: string;
+}
+
 const Tickets = () => {
   const { tickets, addTicket, updateTicket, deleteTicket, addTicketComment, users } = useData();
   const { user, isSupervisor } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<string | null>(null);
   const [comment, setComment] = useState('');
+  const [feedbackForm, setFeedbackForm] = useState<FeedbackFormData>({ feedback: '' });
   const [formData, setFormData] = useState<TicketFormData>({
     problem: '',
     supervisor: '',
@@ -76,6 +82,35 @@ const Tickets = () => {
     }
   };
 
+  const handleAttendTicket = (ticketId: string) => {
+    updateTicket(ticketId, {
+      status: 'in-progress',
+      attendedBy: user!.id,
+      attendedAt: new Date().toISOString()
+    });
+  };
+
+  const handleCloseTicket = (ticketId: string) => {
+    setSelectedTicket(ticketId);
+    setIsFeedbackModalOpen(true);
+  };
+
+  const handleFeedbackSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (selectedTicket && feedbackForm.feedback.trim()) {
+      updateTicket(selectedTicket, {
+        status: 'closed',
+        closedAt: new Date().toISOString(),
+        closingFeedback: feedbackForm.feedback
+      });
+      
+      setFeedbackForm({ feedback: '' });
+      setIsFeedbackModalOpen(false);
+      setSelectedTicket(null);
+    }
+  };
+
   const handleDelete = (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir este chamado?')) {
       deleteTicket(id);
@@ -83,7 +118,11 @@ const Tickets = () => {
   };
 
   const handleStatusChange = (ticketId: string, newStatus: string) => {
-    updateTicket(ticketId, { status: newStatus });
+    if (newStatus === 'closed') {
+      handleCloseTicket(ticketId);
+    } else {
+      updateTicket(ticketId, { status: newStatus });
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -114,6 +153,23 @@ const Tickets = () => {
       default:
         return status;
     }
+  };
+
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString('pt-BR');
+  };
+
+  const getTimeDifference = (startDate: string, endDate?: string) => {
+    const start = new Date(startDate);
+    const end = endDate ? new Date(endDate) : new Date();
+    const diffMs = end.getTime() - start.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (diffHours > 0) {
+      return `${diffHours}h ${diffMinutes}m`;
+    }
+    return `${diffMinutes}m`;
   };
 
   return (
@@ -344,6 +400,7 @@ const Tickets = () => {
             ) : (
               filteredTickets.map(ticket => {
                 const creator = users.find(u => u.id === ticket.createdBy);
+                const attendedBy = ticket.attendedBy ? users.find(u => u.id === ticket.attendedBy) : null;
                 
                 return (
                   <div
@@ -359,18 +416,29 @@ const Tickets = () => {
                           Criado por {creator?.name || 'Usuário Removido'}
                         </span>
                         <span className="text-sm text-gray-500">
-                          em {new Date(ticket.createdAt).toLocaleDateString('pt-BR')}
+                          em {formatDateTime(ticket.createdAt)}
                         </span>
                       </div>
                       
                       <div className="flex items-center space-x-2">
-                        {!isSupervisor && (
+                        {/* Attend Ticket Button */}
+                        {!isSupervisor && ticket.status === 'open' && (
+                          <button
+                            onClick={() => handleAttendTicket(ticket.id)}
+                            className="flex items-center px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                          >
+                            <User className="w-4 h-4 mr-1" />
+                            Atender Chamado
+                          </button>
+                        )}
+
+                        {/* Status Change for non-supervisors */}
+                        {!isSupervisor && ticket.status !== 'open' && (
                           <select
                             value={ticket.status}
                             onChange={(e) => handleStatusChange(ticket.id, e.target.value)}
                             className="text-sm border border-gray-300 rounded px-2 py-1"
                           >
-                            <option value="open">Aberto</option>
                             <option value="in-progress">Em Andamento</option>
                             <option value="resolved">Resolvido</option>
                             <option value="closed">Fechado</option>
@@ -394,6 +462,46 @@ const Tickets = () => {
                           >
                             <Trash2 className="w-5 h-5" />
                           </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Timing Information */}
+                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div className="flex items-center">
+                          <Clock className="w-4 h-4 text-gray-500 mr-2" />
+                          <div>
+                            <p className="font-medium text-gray-700">Tempo decorrido:</p>
+                            <p className="text-gray-600">
+                              {getTimeDifference(ticket.createdAt, ticket.closedAt)}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {ticket.attendedBy && (
+                          <div className="flex items-center">
+                            <User className="w-4 h-4 text-blue-500 mr-2" />
+                            <div>
+                              <p className="font-medium text-gray-700">Atendido por:</p>
+                              <p className="text-gray-600">{attendedBy?.name || 'Usuário Removido'}</p>
+                              {ticket.attendedAt && (
+                                <p className="text-xs text-gray-500">
+                                  {formatDateTime(ticket.attendedAt)}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {ticket.closedAt && (
+                          <div className="flex items-center">
+                            <CheckCircle className="w-4 h-4 text-green-500 mr-2" />
+                            <div>
+                              <p className="font-medium text-gray-700">Finalizado em:</p>
+                              <p className="text-gray-600">{formatDateTime(ticket.closedAt)}</p>
+                            </div>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -422,6 +530,17 @@ const Tickets = () => {
                           <p className="text-sm text-orange-800 font-mono">{ticket.anydeskAccess}</p>
                         </div>
                       </div>
+
+                      {/* Closing Feedback */}
+                      {ticket.closingFeedback && (
+                        <div className="bg-green-50 border border-green-200 p-3 rounded-md">
+                          <h4 className="text-sm font-medium text-green-900 mb-1 flex items-center">
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                            Feedback de Finalização:
+                          </h4>
+                          <p className="text-sm text-green-800">{ticket.closingFeedback}</p>
+                        </div>
+                      )}
                     </div>
 
                     {/* Comments */}
@@ -441,7 +560,7 @@ const Tickets = () => {
                                     {commentUser?.name || 'Usuário Removido'}
                                   </span>
                                   <span className="text-xs text-gray-500">
-                                    {new Date(comment.createdAt).toLocaleString('pt-BR')}
+                                    {formatDateTime(comment.createdAt)}
                                   </span>
                                 </div>
                                 <p className="text-sm text-gray-600">{comment.content}</p>
@@ -506,6 +625,73 @@ const Tickets = () => {
                 >
                   <Send className="w-4 h-4 mr-2" />
                   Enviar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Modal */}
+      {isFeedbackModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center">
+                <AlertCircle className="w-6 h-6 text-orange-500 mr-2" />
+                Finalizar Chamado
+              </h2>
+              <button
+                onClick={() => {
+                  setIsFeedbackModalOpen(false);
+                  setSelectedTicket(null);
+                  setFeedbackForm({ feedback: '' });
+                }}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-md">
+              <p className="text-sm text-orange-800">
+                <strong>Atenção:</strong> Para finalizar este chamado, é obrigatório fornecer um feedback sobre a resolução do problema.
+              </p>
+            </div>
+
+            <form onSubmit={handleFeedbackSubmit}>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Feedback de Finalização *
+                </label>
+                <textarea
+                  required
+                  value={feedbackForm.feedback}
+                  onChange={(e) => setFeedbackForm({ feedback: e.target.value })}
+                  placeholder="Descreva como o problema foi resolvido, quais ações foram tomadas, etc..."
+                  className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  rows={4}
+                />
+              </div>
+
+              <div className="mt-6 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsFeedbackModalOpen(false);
+                    setSelectedTicket(null);
+                    setFeedbackForm({ feedback: '' });
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Finalizar Chamado
                 </button>
               </div>
             </form>

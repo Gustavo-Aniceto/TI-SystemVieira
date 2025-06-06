@@ -116,6 +116,10 @@ export interface Ticket {
   status: 'open' | 'in-progress' | 'resolved' | 'closed';
   createdBy: string;
   assignedTo?: string;
+  attendedBy?: string;
+  attendedAt?: string;
+  closedAt?: string;
+  closingFeedback?: string;
   comments: TicketComment[];
   createdAt: string;
   updatedAt: string;
