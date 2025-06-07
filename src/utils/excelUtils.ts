@@ -68,6 +68,23 @@ export const generateExcel = (
           'Produto Relacionado': item.productName || '-',
           'Data de Criação': formatDate(item.createdAt)
         };
+
+      case 'tickets':
+        return {
+          'ID': item.id,
+          'Problema': item.problem,
+          'Supervisor': item.supervisor,
+          'Operador': item.operator,
+          'Empresa': item.company,
+          'Acesso AnyDesk': item.anydeskAccess,
+          'Status': formatTicketStatus(item.status),
+          'Criado por': item.creatorName,
+          'Atendido por': item.attendantName,
+          'Data de Criação': formatDateTime(item.createdAt),
+          'Data de Atendimento': formatDateTime(item.attendedAt),
+          'Data de Fechamento': formatDateTime(item.closedAt),
+          'Feedback': item.closingFeedback || '-'
+        };
       
       default:
         return item;
@@ -95,11 +112,27 @@ const formatDate = (dateString: string): string => {
   return date.toLocaleDateString('pt-BR');
 };
 
+const formatDateTime = (dateString: string): string => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleString('pt-BR');
+};
+
 const formatStatus = (status: string): string => {
   switch (status) {
     case 'active': return 'Ativo';
     case 'inactive': return 'Inativo';
     case 'maintenance': return 'Em Manutenção';
+    default: return status;
+  }
+};
+
+const formatTicketStatus = (status: string): string => {
+  switch (status) {
+    case 'open': return 'Aberto';
+    case 'in-progress': return 'Em Andamento';
+    case 'resolved': return 'Resolvido';
+    case 'closed': return 'Fechado';
     default: return status;
   }
 };

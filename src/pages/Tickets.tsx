@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Ticket, MessageSquare, Plus, Edit, Trash2, X, Filter, Send, FileText, Clock, CheckCircle, User, AlertCircle } from 'lucide-react';
+import { Ticket, MessageSquare, Plus, Edit, Trash2, X, Filter, Send, FileText, Clock, CheckCircle, User, AlertCircle, Lock } from 'lucide-react';
 
 interface TicketFormData {
   problem: string;
@@ -118,11 +118,29 @@ const Tickets = () => {
   };
 
   const handleStatusChange = (ticketId: string, newStatus: string) => {
+    const ticket = tickets.find(t => t.id === ticketId);
+    
+    // Check if user can modify this ticket
+    if (ticket && ticket.attendedBy && ticket.attendedBy !== user?.id && user?.role !== 'admin') {
+      return; // Can't modify tickets attended by others
+    }
+    
     if (newStatus === 'closed') {
       handleCloseTicket(ticketId);
     } else {
       updateTicket(ticketId, { status: newStatus });
     }
+  };
+
+  const canModifyTicket = (ticket: any) => {
+    // Admin can modify any ticket
+    if (user?.role === 'admin') return true;
+    
+    // Supervisor can only modify their own tickets
+    if (isSupervisor) return ticket.createdBy === user?.id;
+    
+    // Other users can only modify tickets they are attending or unattended tickets
+    return !ticket.attendedBy || ticket.attendedBy === user?.id;
   };
 
   const getStatusColor = (status: string) => {
@@ -401,6 +419,7 @@ const Tickets = () => {
               filteredTickets.map(ticket => {
                 const creator = users.find(u => u.id === ticket.createdBy);
                 const attendedBy = ticket.attendedBy ? users.find(u => u.id === ticket.attendedBy) : null;
+                const canModify = canModifyTicket(ticket);
                 
                 return (
                   <div
@@ -418,11 +437,17 @@ const Tickets = () => {
                         <span className="text-sm text-gray-500">
                           em {formatDateTime(ticket.createdAt)}
                         </span>
+                        {ticket.attendedBy && ticket.attendedBy !== user?.id && (
+                          <span className="flex items-center text-sm text-orange-600">
+                            <Lock className="w-4 h-4 mr-1" />
+                            Atendido por {attendedBy?.name}
+                          </span>
+                        )}
                       </div>
                       
                       <div className="flex items-center space-x-2">
                         {/* Attend Ticket Button */}
-                        {!isSupervisor && ticket.status === 'open' && (
+                        {!isSupervisor && ticket.status === 'open' && !ticket.attendedBy && (
                           <button
                             onClick={() => handleAttendTicket(ticket.id)}
                             className="flex items-center px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
@@ -432,8 +457,8 @@ const Tickets = () => {
                           </button>
                         )}
 
-                        {/* Status Change for non-supervisors */}
-                        {!isSupervisor && ticket.status !== 'open' && (
+                        {/* Status Change for authorized users */}
+                        {!isSupervisor && ticket.status !== 'open' && canModify && (
                           <select
                             value={ticket.status}
                             onChange={(e) => handleStatusChange(ticket.id, e.target.value)}

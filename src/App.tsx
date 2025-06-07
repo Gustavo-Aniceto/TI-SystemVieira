@@ -25,10 +25,20 @@ const ProtectedRoute = ({ children, roles }: { children: React.ReactNode, roles?
   }
   
   if (roles && !roles.includes(user.role)) {
-    return <Navigate to="/\" replace />;
+    return <Navigate to="/tickets" replace />;
   }
   
   return <>{children}</>;
+};
+
+const SupervisorRedirect = () => {
+  const { user } = useAuth();
+  
+  if (user?.role === 'supervisor') {
+    return <Navigate to="/tickets" replace />;
+  }
+  
+  return <Dashboard />;
 };
 
 function App() {
@@ -44,7 +54,7 @@ function App() {
                 <Layout />
               </ProtectedRoute>
             }>
-              <Route index element={<Dashboard />} />
+              <Route index element={<SupervisorRedirect />} />
               <Route path="categories" element={
                 <ProtectedRoute roles={['admin', 'user']}>
                   <Categories />
@@ -55,13 +65,21 @@ function App() {
                   <Products />
                 </ProtectedRoute>
               } />
-              <Route path="calendar" element={<Calendar />} />
+              <Route path="calendar" element={
+                <ProtectedRoute roles={['admin', 'user', 'intern']}>
+                  <Calendar />
+                </ProtectedRoute>
+              } />
               <Route path="reports" element={
                 <ProtectedRoute roles={['admin']}>
                   <Reports />
                 </ProtectedRoute>
               } />
-              <Route path="notes" element={<Notes />} />
+              <Route path="notes" element={
+                <ProtectedRoute roles={['admin', 'user', 'intern']}>
+                  <Notes />
+                </ProtectedRoute>
+              } />
               <Route path="tickets" element={<Tickets />} />
               <Route path="users" element={
                 <ProtectedRoute roles={['admin']}>

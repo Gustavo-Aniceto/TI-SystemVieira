@@ -569,6 +569,38 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         columns = ['ID', 'Título', 'Conteúdo', 'Tipo', 'Usuário', 'Visibilidade', 'Criado em', 'Atualizado em'];
         break;
+
+      case 'tickets':
+        data = tickets;
+        if (filters.status) {
+          data = data.filter(ticket => ticket.status === filters.status);
+        }
+        if (filters.createdBy) {
+          data = data.filter(ticket => ticket.createdBy === filters.createdBy);
+        }
+        if (filters.attendedBy) {
+          data = data.filter(ticket => ticket.attendedBy === filters.attendedBy);
+        }
+        if (filters.startDate) {
+          data = data.filter(ticket => new Date(ticket.createdAt) >= new Date(filters.startDate));
+        }
+        if (filters.endDate) {
+          data = data.filter(ticket => new Date(ticket.createdAt) <= new Date(filters.endDate));
+        }
+
+        // Enrich data with user names
+        data = data.map(ticket => {
+          const creator = users.find(u => u.id === ticket.createdBy);
+          const attendant = ticket.attendedBy ? users.find(u => u.id === ticket.attendedBy) : null;
+          return {
+            ...ticket,
+            creatorName: creator ? creator.name : 'Usuário Removido',
+            attendantName: attendant ? attendant.name : 'Não atendido'
+          };
+        });
+
+        columns = ['ID', 'Problema', 'Supervisor', 'Operador', 'Empresa', 'Acesso AnyDesk', 'Status', 'Criado por', 'Atendido por', 'Data de Criação', 'Data de Atendimento', 'Data de Fechamento', 'Feedback'];
+        break;
         
       default:
         toast.error('Tipo de relatório inválido');

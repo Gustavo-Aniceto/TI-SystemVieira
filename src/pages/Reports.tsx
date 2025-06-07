@@ -10,10 +10,12 @@ interface ReportFormData {
   startDate?: string;
   endDate?: string;
   eventType?: string;
+  createdBy?: string;
+  attendedBy?: string;
 }
 
 const Reports = () => {
-  const { categories, generateReport } = useData();
+  const { categories, users, generateReport } = useData();
   const [formData, setFormData] = useState<ReportFormData>({
     type: 'products'
   });
@@ -45,6 +47,14 @@ const Reports = () => {
         if (formData.startDate) filters.startDate = formData.startDate;
         if (formData.endDate) filters.endDate = formData.endDate;
         if (formData.eventType) filters.type = formData.eventType;
+        break;
+
+      case 'tickets':
+        if (formData.status) filters.status = formData.status;
+        if (formData.createdBy) filters.createdBy = formData.createdBy;
+        if (formData.attendedBy) filters.attendedBy = formData.attendedBy;
+        if (formData.startDate) filters.startDate = formData.startDate;
+        if (formData.endDate) filters.endDate = formData.endDate;
         break;
     }
     
@@ -82,6 +92,7 @@ const Reports = () => {
                 <option value="products">Produtos</option>
                 <option value="categories">Categorias</option>
                 <option value="events">Eventos</option>
+                <option value="tickets">Chamados</option>
               </select>
             </div>
             
@@ -193,6 +204,102 @@ const Reports = () => {
                 </div>
               </div>
             )}
+
+            {formData.type === 'tickets' && (
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
+                    Status
+                  </label>
+                  <select
+                    id="status"
+                    name="status"
+                    value={formData.status || ''}
+                    onChange={handleChange}
+                    className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="">Todos os status</option>
+                    <option value="open">Aberto</option>
+                    <option value="in-progress">Em Andamento</option>
+                    <option value="resolved">Resolvido</option>
+                    <option value="closed">Fechado</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="createdBy" className="block text-sm font-medium text-gray-700 mb-1">
+                      Criado por
+                    </label>
+                    <select
+                      id="createdBy"
+                      name="createdBy"
+                      value={formData.createdBy || ''}
+                      onChange={handleChange}
+                      className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">Todos os usuários</option>
+                      {users.map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="attendedBy" className="block text-sm font-medium text-gray-700 mb-1">
+                      Atendido por
+                    </label>
+                    <select
+                      id="attendedBy"
+                      name="attendedBy"
+                      value={formData.attendedBy || ''}
+                      onChange={handleChange}
+                      className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">Todos os atendentes</option>
+                      {users.filter(u => u.role !== 'supervisor').map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
+                      Data de Início
+                    </label>
+                    <input
+                      type="date"
+                      id="startDate"
+                      name="startDate"
+                      value={formData.startDate || ''}
+                      onChange={handleChange}
+                      className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
+                      Data de Término
+                    </label>
+                    <input
+                      type="date"
+                      id="endDate"
+                      name="endDate"
+                      value={formData.endDate || ''}
+                      onChange={handleChange}
+                      min={formData.startDate}
+                      className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
             
             <div className="pt-4">
               <button
@@ -213,7 +320,7 @@ const Reports = () => {
         </div>
         
         <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="border border-gray-200 rounded-lg p-4">
               <div className="flex items-center mb-3">
                 <div className="bg-blue-100 rounded-full p-2 mr-2">
@@ -247,6 +354,18 @@ const Reports = () => {
               </div>
               <p className="text-sm text-gray-600">
                 Exporte seus eventos de calendário, incluindo assinaturas, tarefas e lembretes com datas e descrições.
+              </p>
+            </div>
+
+            <div className="border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center mb-3">
+                <div className="bg-orange-100 rounded-full p-2 mr-2">
+                  <FileText className="w-5 h-5 text-orange-600" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900">Chamados</h3>
+              </div>
+              <p className="text-sm text-gray-600">
+                Relatórios completos de chamados incluindo problemas, status, tempos de atendimento e feedbacks.
               </p>
             </div>
           </div>
