@@ -25,7 +25,7 @@ const ProtectedRoute = ({ children, roles }: { children: React.ReactNode, roles?
   }
   
   if (roles && !roles.includes(user.role)) {
-    return <Navigate to="/tickets" replace />;
+    return <Navigate to="/tickets\" replace />;
   }
   
   return <>{children}</>;
@@ -48,7 +48,7 @@ function App() {
         <Router>
           <Toaster position="top-right" />
           <Routes>
-            <Route path="/login" element={<Login />} />
+            <Route path="/login\" element={<Login />} />
             <Route path="/" element={
               <ProtectedRoute>
                 <Layout />
