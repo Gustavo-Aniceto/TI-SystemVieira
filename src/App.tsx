@@ -25,7 +25,7 @@ const ProtectedRoute = ({ children, roles }: { children: React.ReactNode, roles?
   }
   
   if (roles && !roles.includes(user.role)) {
-    return <Navigate to="/tickets\" replace />;
+    return <Navigate to="/tickets" replace />;
   }
   
   return <>{children}</>;
@@ -41,6 +41,64 @@ const SupervisorRedirect = () => {
   return <Dashboard />;
 };
 
+const AuthenticatedApp = () => {
+  const { user } = useAuth();
+  
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return (
+    <Layout>
+      <Routes>
+        <Route index element={<SupervisorRedirect />} />
+        <Route path="categories" element={
+          <ProtectedRoute roles={['admin', 'user']}>
+            <Categories />
+          </ProtectedRoute>
+        } />
+        <Route path="products" element={
+          <ProtectedRoute roles={['admin', 'user']}>
+            <Products />
+          </ProtectedRoute>
+        } />
+        <Route path="calendar" element={
+          <ProtectedRoute roles={['admin', 'user', 'intern']}>
+            <Calendar />
+          </ProtectedRoute>
+        } />
+        <Route path="reports" element={
+          <ProtectedRoute roles={['admin']}>
+            <Reports />
+          </ProtectedRoute>
+        } />
+        <Route path="notes" element={
+          <ProtectedRoute roles={['admin', 'user', 'intern']}>
+            <Notes />
+          </ProtectedRoute>
+        } />
+        <Route path="tickets" element={<Tickets />} />
+        <Route path="users" element={
+          <ProtectedRoute roles={['admin']}>
+            <Users />
+          </ProtectedRoute>
+        } />
+        <Route path="intern-activities" element={
+          <ProtectedRoute roles={['intern']}>
+            <InternActivities />
+          </ProtectedRoute>
+        } />
+        <Route path="intern-review" element={
+          <ProtectedRoute roles={['admin']}>
+            <InternReview />
+          </ProtectedRoute>
+        } />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Layout>
+  );
+};
+
 function App() {
   return (
     <AuthProvider>
@@ -48,56 +106,8 @@ function App() {
         <Router>
           <Toaster position="top-right" />
           <Routes>
-            <Route path="/login\" element={<Login />} />
-            <Route path="/" element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }>
-              <Route index element={<SupervisorRedirect />} />
-              <Route path="categories" element={
-                <ProtectedRoute roles={['admin', 'user']}>
-                  <Categories />
-                </ProtectedRoute>
-              } />
-              <Route path="products" element={
-                <ProtectedRoute roles={['admin', 'user']}>
-                  <Products />
-                </ProtectedRoute>
-              } />
-              <Route path="calendar" element={
-                <ProtectedRoute roles={['admin', 'user', 'intern']}>
-                  <Calendar />
-                </ProtectedRoute>
-              } />
-              <Route path="reports" element={
-                <ProtectedRoute roles={['admin']}>
-                  <Reports />
-                </ProtectedRoute>
-              } />
-              <Route path="notes" element={
-                <ProtectedRoute roles={['admin', 'user', 'intern']}>
-                  <Notes />
-                </ProtectedRoute>
-              } />
-              <Route path="tickets" element={<Tickets />} />
-              <Route path="users" element={
-                <ProtectedRoute roles={['admin']}>
-                  <Users />
-                </ProtectedRoute>
-              } />
-              <Route path="intern-activities" element={
-                <ProtectedRoute roles={['intern']}>
-                  <InternActivities />
-                </ProtectedRoute>
-              } />
-              <Route path="intern-review" element={
-                <ProtectedRoute roles={['admin']}>
-                  <InternReview />
-                </ProtectedRoute>
-              } />
-            </Route>
-            <Route path="*" element={<NotFound />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/*" element={<AuthenticatedApp />} />
           </Routes>
         </Router>
       </DataProvider>
