@@ -25,7 +25,7 @@ const ProtectedRoute = ({ children, roles }: { children: React.ReactNode, roles?
   }
   
   if (roles && !roles.includes(user.role)) {
-    return <Navigate to="/tickets" replace />;
+    return <Navigate to="/tickets\" replace />;
   }
   
   return <>{children}</>;
@@ -45,7 +45,7 @@ const AuthenticatedApp = () => {
   const { user } = useAuth();
   
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login\" replace />;
   }
   
   return (
