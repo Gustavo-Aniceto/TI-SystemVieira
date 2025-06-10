@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Category, Product, CalendarEvent, User, InternActivity, MovementRecord, Note, ChecklistItem, Ticket, TicketComment } from '../types';
+import { Category, Product, CalendarEvent, User, InternActivity, MovementRecord, Note, ChecklistItem, Ticket, TicketComment, TicketTransfer } from '../types';
 import { generateExcel } from '../utils/excelUtils';
 import toast from 'react-hot-toast';
 
@@ -49,10 +49,12 @@ interface DataContextType {
 
   // Tickets
   tickets: Ticket[];
-  addTicket: (ticket: Omit<Ticket, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'status'>) => void;
+  addTicket: (ticket: Omit<Ticket, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'status' | 'attachments' | 'transfers'>) => void;
   updateTicket: (id: string, ticket: Partial<Ticket>) => void;
   deleteTicket: (id: string) => void;
   addTicketComment: (ticketId: string, comment: Omit<TicketComment, 'id' | 'createdAt'>) => void;
+  transferTicket: (ticketId: string, transfer: Omit<TicketTransfer, 'id' | 'transferredAt'>) => void;
+  respondToTransfer: (ticketId: string, transferId: string, response: 'accepted' | 'rejected') => void;
 }
 
 const DataContext = createContext<DataContextType>({} as DataContextType);
@@ -405,13 +407,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Ticket operations
-  const addTicket = (ticket: Omit<Ticket, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'status'>) => {
+  const addTicket = (ticket: Omit<Ticket, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'status' | 'attachments' | 'transfers'>) => {
     const now = new Date().toISOString();
     const newTicket = {
       ...ticket,
       id: Date.now().toString(),
-      status: 'open',
+      status: 'open' as const,
       comments: [],
+      attachments: [],
+      transfers: [],
       createdAt: now,
       updatedAt: now
     };
@@ -458,6 +462,69 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       )
     );
     toast.success('Comentário adicionado com sucesso!');
+  };
+
+  const transferTicket = (ticketId: string, transfer: Omit<TicketTransfer, 'id' | 'transferredAt'>) => {
+    const newTransfer = {
+      ...transfer,
+      id: Date.now().toString(),
+      transferredAt: new Date().toISOString()
+    };
+
+    setTickets(
+      tickets.map(ticket =>
+        ticket.id === ticketId
+          ? {
+              ...ticket,
+              transfers: [...ticket.transfers, newTransfer],
+              updatedAt: new Date().toISOString()
+            }
+          : ticket
+      )
+    );
+    toast.success('Solicitação de transferência enviada!');
+  };
+
+  const respondToTransfer = (ticketId: string, transferId: string, response: 'accepted' | 'rejected') => {
+    setTickets(
+      tickets.map(ticket => {
+        if (ticket.id === ticketId) {
+          const updatedTransfers = ticket.transfers.map(transfer =>
+            transfer.id === transferId
+              ? {
+                  ...transfer,
+                  status: response,
+                  respondedAt: new Date().toISOString()
+                }
+              : transfer
+          );
+
+          // If accepted, update the ticket's attendedBy
+          let updatedTicket = {
+            ...ticket,
+            transfers: updatedTransfers,
+            updatedAt: new Date().toISOString()
+          };
+
+          if (response === 'accepted') {
+            const acceptedTransfer = updatedTransfers.find(t => t.id === transferId);
+            if (acceptedTransfer) {
+              updatedTicket = {
+                ...updatedTicket,
+                attendedBy: acceptedTransfer.toUserId,
+                attendedAt: new Date().toISOString(),
+                status: 'in-progress'
+              };
+            }
+          }
+
+          return updatedTicket;
+        }
+        return ticket;
+      })
+    );
+
+    toast.success(response === 'accepted' ? 'Transferência aceita!' : 'Transferência rejeitada!');
   };
 
   // Reports
@@ -653,7 +720,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addTicket,
         updateTicket,
         deleteTicket,
-        addTicketComment
+        addTicketComment,
+        transferTicket,
+        respondToTransfer
       }}
     >
       {children}

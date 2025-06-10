@@ -106,6 +106,25 @@ export interface ChecklistItem {
   createdAt: string;
 }
 
+export interface TicketAttachment {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  data: string; // base64 encoded file data
+  uploadedAt: string;
+}
+
+export interface TicketTransfer {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  reason: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  transferredAt: string;
+  respondedAt?: string;
+}
+
 export interface Ticket {
   id: string;
   problem: string;
@@ -120,6 +139,8 @@ export interface Ticket {
   attendedAt?: string;
   closedAt?: string;
   closingFeedback?: string;
+  attachments: TicketAttachment[];
+  transfers: TicketTransfer[];
   comments: TicketComment[];
   createdAt: string;
   updatedAt: string;
