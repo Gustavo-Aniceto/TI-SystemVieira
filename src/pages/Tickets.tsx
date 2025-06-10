@@ -279,10 +279,8 @@ const Tickets = () => {
         return 'Aberto';
       case 'in-progress':
         return 'Em Andamento';
-      case 'resolved':
-        return 'Resolvido';
       case 'closed':
-        return 'Fechado';
+        return 'Resolvido';
       default:
         return status;
     }
@@ -396,8 +394,6 @@ const Tickets = () => {
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              <Ticket className="w-4 h-4 inline mr-1" />
-              Todos os Chamados ({tickets.length})
             </button>
           )}
 
@@ -446,7 +442,7 @@ const Tickets = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    👩🏽‍💼 SUPERVISORA *
+                    👩🏽‍💼 SUPERVISOR *
                   </label>
                   <input
                     type="text"
@@ -460,7 +456,7 @@ const Tickets = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    👩🏽‍💻 OPERADOR *
+                    👩🏽‍💻 POSIÇÃO DO OPERADOR *
                   </label>
                   <input
                     type="text"
@@ -476,7 +472,7 @@ const Tickets = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    🏢 EMPRESA *
+                    🏢 EMPRESA/SETOR *
                   </label>
                   <input
                     type="text"
@@ -484,13 +480,13 @@ const Tickets = () => {
                     value={formData.company}
                     onChange={(e) => setFormData({ ...formData, company: e.target.value })}
                     className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    placeholder="Nome da empresa"
+                    placeholder="Nome da empresa ou setor"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    🔑 ACESSO ANYDESK *
+                    🔑 ID DE ACESSO *
                   </label>
                   <input
                     type="text"
@@ -498,7 +494,7 @@ const Tickets = () => {
                     value={formData.anydeskAccess}
                     onChange={(e) => setFormData({ ...formData, anydeskAccess: e.target.value })}
                     className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    placeholder="ID e senha do AnyDesk"
+                    placeholder="ID de acesso "
                   />
                 </div>
               </div>
@@ -591,8 +587,7 @@ const Tickets = () => {
                   <option value="">Todos</option>
                   <option value="open">Aberto</option>
                   <option value="in-progress">Em Andamento</option>
-                  <option value="resolved">Resolvido</option>
-                  <option value="closed">Fechado</option>
+                  <option value="closed">Resolvido</option>
                 </select>
                 <button
                   onClick={() => setFilterStatus('')}
@@ -707,8 +702,7 @@ const Tickets = () => {
                             className="text-sm border border-gray-300 rounded px-2 py-1"
                           >
                             <option value="in-progress">Em Andamento</option>
-                            <option value="resolved">Resolvido</option>
-                            <option value="closed">Fechado</option>
+                            <option value="closed">Resolvido</option>
                           </select>
                         )}
                         
@@ -800,19 +794,19 @@ const Tickets = () => {
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="bg-blue-50 p-3 rounded-md">
-                          <h4 className="text-sm font-medium text-blue-900 mb-1">👩🏽‍💼 SUPERVISORA:</h4>
+                          <h4 className="text-sm font-medium text-blue-900 mb-1">👩🏽‍💼 SUPERVISOR:</h4>
                           <p className="text-sm text-blue-800">{ticket.supervisor}</p>
                         </div>
                         <div className="bg-green-50 p-3 rounded-md">
-                          <h4 className="text-sm font-medium text-green-900 mb-1">👩🏽‍💻 OPERADOR:</h4>
+                          <h4 className="text-sm font-medium text-green-900 mb-1">👩🏽‍💻 POSIÇÃO DO OPERADOR:</h4>
                           <p className="text-sm text-green-800">{ticket.operator}</p>
                         </div>
                         <div className="bg-purple-50 p-3 rounded-md">
-                          <h4 className="text-sm font-medium text-purple-900 mb-1">🏢 EMPRESA:</h4>
+                          <h4 className="text-sm font-medium text-purple-900 mb-1">🏢 EMPRESA/SETOR:</h4>
                           <p className="text-sm text-purple-800">{ticket.company}</p>
                         </div>
                         <div className="bg-orange-50 p-3 rounded-md">
-                          <h4 className="text-sm font-medium text-orange-900 mb-1">🔑 ACESSO ANYDESK:</h4>
+                          <h4 className="text-sm font-medium text-orange-900 mb-1">🔑 ID DE ACESSO:</h4>
                           <p className="text-sm text-orange-800 font-mono">{ticket.anydeskAccess}</p>
                         </div>
                       </div>
