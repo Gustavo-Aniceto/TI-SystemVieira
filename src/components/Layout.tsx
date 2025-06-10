@@ -78,25 +78,25 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         </div>
         
         <nav className="flex-1 space-y-1">
-          {!isSupervisor && <NavItem to="/" icon={<LayoutGrid size={20} />} label="Dashboard" />}
+          {!isSupervisor && <NavItem to="/\" icon={<LayoutGrid size={20} />} label="Dashboard" />}
           {!isIntern && !isSupervisor && (
             <>
-              <NavItem to="/categories" icon={<Layers size={20} />} label="Categorias" />
+              <NavItem to="/categories\" icon={<Layers size={20} />} label="Categorias" />
               <NavItem to="/products" icon={<Package size={20} />} label="Produtos" />
             </>
           )}
           {!isSupervisor && <NavItem to="/calendar" icon={<CalendarIcon size={20} />} label="Calendário" />}
           <NavItem to="/tickets" icon={<Ticket size={20} />} label="Chamados" />
-          {!isSupervisor && <NavItem to="/notes" icon={<StickyNote size={20} />} label="Anotações" />}
+          {!isSupervisor && <NavItem to="/notes\" icon={<StickyNote size={20} />} label="Anotações" />}
           {!isIntern && !isSupervisor && (
-            <NavItem to="/reports" icon={<FileText size={20} />} label="Relatórios" />
+            <NavItem to="/reports\" icon={<FileText size={20} />} label="Relatórios" />
           )}
-          {isAdmin && <NavItem to="/users" icon={<Users size={20} />} label="Usuários" />}
+          {isAdmin && <NavItem to="/users\" icon={<Users size={20} />} label="Usuários" />}
           {isIntern && (
-            <NavItem to="/intern-activities" icon={<ClipboardList size={20} />} label="Minhas Atividades" />
+            <NavItem to="/intern-activities\" icon={<ClipboardList size={20} />} label="Minhas Atividades" />
           )}
           {isAdmin && (
-            <NavItem to="/intern-review" icon={<UserCheck size={20} />} label="Revisão de Estagiários" />
+            <NavItem to="/intern-review\" icon={<UserCheck size={20} />} label="Revisão de Estagiários" />
           )}
         </nav>
         
