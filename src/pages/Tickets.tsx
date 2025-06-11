@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Ticket, MessageSquare, Plus, Edit, Trash2, X, Filter, Send, FileText, Clock, CheckCircle, User, AlertCircle, Lock, Upload, Download, Share2, Check, XIcon } from 'lucide-react';
+import { Ticket, MessageSquare, Plus, Edit, Trash2, X, Filter, Send, FileText, Clock, CheckCircle, User, AlertCircle, Lock, Upload, Download, Share2, Check, XIcon, Bell } from 'lucide-react';
 
 interface TicketFormData {
   problem: string;
@@ -41,13 +41,112 @@ const Tickets = () => {
     attachments: []
   });
   const [filterStatus, setFilterStatus] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'create' | 'my-tickets' | 'all-tickets' | 'transfers'>(
-    isSupervisor ? 'create' : 'all-tickets'
+  const [activeTab, setActiveTab] = useState<'create' | 'new-tickets' | 'my-tickets' | 'transfers'>(
+    isSupervisor ? 'create' : 'new-tickets'
   );
+  const [lastViewedCounts, setLastViewedCounts] = useState({
+    newTickets: 0,
+    myTickets: 0,
+    transfers: 0,
+    comments: {} as Record<string, number>
+  });
+
+  // Load last viewed counts from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(`ticketCounts_${user?.id}`);
+    if (saved) {
+      setLastViewedCounts(JSON.parse(saved));
+    }
+  }, [user?.id]);
+
+  // Save counts when tab changes
+  useEffect(() => {
+    const counts = {
+      newTickets: getNewTicketsCount(),
+      myTickets: getMyTicketsCount(),
+      transfers: getPendingTransfersCount(),
+      comments: getCommentsCount()
+    };
+    
+    localStorage.setItem(`ticketCounts_${user?.id}`, JSON.stringify(counts));
+  }, [activeTab]);
+
+  // Get counts for notifications
+  const getNewTicketsCount = () => {
+    if (isSupervisor) return 0;
+    return tickets.filter(ticket => 
+      ticket.status === 'open' && !ticket.attendedBy
+    ).length;
+  };
+
+  const getMyTicketsCount = () => {
+    if (isSupervisor) {
+      return tickets.filter(ticket => ticket.createdBy === user?.id).length;
+    }
+    return tickets.filter(ticket => 
+      ticket.createdBy === user?.id || ticket.attendedBy === user?.id
+    ).length;
+  };
+
+  const getPendingTransfersCount = () => {
+    if (isSupervisor) return 0;
+    return tickets.filter(ticket =>
+      ticket.transfers.some(transfer => 
+        transfer.toUserId === user?.id && transfer.status === 'pending'
+      )
+    ).length;
+  };
+
+  const getCommentsCount = () => {
+    const counts: Record<string, number> = {};
+    tickets.forEach(ticket => {
+      if (ticket.createdBy === user?.id || ticket.attendedBy === user?.id) {
+        counts[ticket.id] = ticket.comments.length;
+      }
+    });
+    return counts;
+  };
+
+  // Calculate notification badges
+  const getNotificationCount = (tab: string) => {
+    const current = {
+      newTickets: getNewTicketsCount(),
+      myTickets: getMyTicketsCount(),
+      transfers: getPendingTransfersCount()
+    };
+
+    const last = lastViewedCounts;
+
+    switch (tab) {
+      case 'new-tickets':
+        return Math.max(0, current.newTickets - last.newTickets);
+      case 'my-tickets':
+        // Check for new comments in my tickets
+        const myTickets = tickets.filter(ticket => 
+          ticket.createdBy === user?.id || ticket.attendedBy === user?.id
+        );
+        let newComments = 0;
+        myTickets.forEach(ticket => {
+          const currentComments = ticket.comments.length;
+          const lastComments = last.comments[ticket.id] || 0;
+          newComments += Math.max(0, currentComments - lastComments);
+        });
+        return newComments;
+      case 'transfers':
+        return Math.max(0, current.transfers - last.transfers);
+      default:
+        return 0;
+    }
+  };
 
   // Filter tickets based on user role and active tab
   const filteredTickets = tickets.filter(ticket => {
     if (filterStatus && ticket.status !== filterStatus) return false;
+    
+    if (activeTab === 'new-tickets') {
+      // Show only open tickets without attendant (for non-supervisors)
+      return ticket.status === 'open' && !ticket.attendedBy;
+    }
     
     if (activeTab === 'my-tickets') {
       // Supervisors only see tickets they created
@@ -67,20 +166,6 @@ const Tickets = () => {
     
     return true;
   });
-
-  // Get pending transfers for current user
-  const pendingTransfers = tickets.filter(ticket =>
-    ticket.transfers.some(transfer => 
-      transfer.toUserId === user?.id && transfer.status === 'pending'
-    )
-  );
-
-  const myTicketsCount = tickets.filter(ticket => 
-    isSupervisor ? ticket.createdBy === user?.id : 
-    (ticket.createdBy === user?.id || ticket.attendedBy === user?.id)
-  ).length;
-  
-  const openTicketsCount = tickets.filter(ticket => ticket.status === 'open').length;
 
   const resetForm = () => {
     setFormData({
@@ -227,6 +312,12 @@ const Tickets = () => {
   };
 
   const handleDelete = (id: string) => {
+    const ticket = tickets.find(t => t.id === id);
+    if (ticket?.status === 'closed') {
+      alert('Não é possível excluir chamados finalizados.');
+      return;
+    }
+    
     if (window.confirm('Tem certeza que deseja excluir este chamado?')) {
       deleteTicket(id);
     }
@@ -234,6 +325,11 @@ const Tickets = () => {
 
   const handleStatusChange = (ticketId: string, newStatus: string) => {
     const ticket = tickets.find(t => t.id === ticketId);
+    
+    // Don't allow changes to closed tickets
+    if (ticket?.status === 'closed') {
+      return;
+    }
     
     // Check if user can modify this ticket
     if (ticket && ticket.attendedBy && ticket.attendedBy !== user?.id && user?.role !== 'admin') {
@@ -248,6 +344,9 @@ const Tickets = () => {
   };
 
   const canModifyTicket = (ticket: any) => {
+    // Can't modify closed tickets
+    if (ticket.status === 'closed') return false;
+    
     // Admin can modify any ticket
     if (user?.role === 'admin') return true;
     
@@ -256,6 +355,14 @@ const Tickets = () => {
     
     // Other users can only modify tickets they are attending or unattended tickets
     return !ticket.attendedBy || ticket.attendedBy === user?.id;
+  };
+
+  const canDeleteTicket = (ticket: any) => {
+    // Can't delete closed tickets
+    if (ticket.status === 'closed') return false;
+    
+    // Only admin can delete tickets
+    return user?.role === 'admin';
   };
 
   const getStatusColor = (status: string) => {
@@ -316,6 +423,16 @@ const Tickets = () => {
     u.role !== 'supervisor' && u.id !== user?.id
   );
 
+  const NotificationBadge = ({ count }: { count: number }) => {
+    if (count === 0) return null;
+    
+    return (
+      <span className="ml-1 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+        {count > 99 ? '99+' : count}
+      </span>
+    );
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -330,30 +447,6 @@ const Tickets = () => {
             }
           </p>
         </div>
-        
-        {/* Stats Cards for Supervisor */}
-        {isSupervisor && (
-          <div className="flex space-x-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="flex items-center">
-                <FileText className="w-5 h-5 text-blue-600 mr-2" />
-                <div>
-                  <p className="text-sm font-medium text-blue-900">Meus Chamados</p>
-                  <p className="text-lg font-bold text-blue-600">{myTicketsCount}</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-              <div className="flex items-center">
-                <Clock className="w-5 h-5 text-yellow-600 mr-2" />
-                <div>
-                  <p className="text-sm font-medium text-yellow-900">Em Aberto</p>
-                  <p className="text-lg font-bold text-yellow-600">{openTicketsCount}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Navigation Tabs */}
@@ -373,46 +466,46 @@ const Tickets = () => {
             </button>
           )}
           
+          {!isSupervisor && (
+            <button
+              onClick={() => setActiveTab('new-tickets')}
+              className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
+                activeTab === 'new-tickets'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <Bell className="w-4 h-4 inline mr-1" />
+              Novos Chamados ({getNewTicketsCount()})
+              <NotificationBadge count={getNotificationCount('new-tickets')} />
+            </button>
+          )}
+          
           <button
             onClick={() => setActiveTab('my-tickets')}
-            className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${
+            className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
               activeTab === 'my-tickets'
                 ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
             <FileText className="w-4 h-4 inline mr-1" />
-            {isSupervisor ? 'Meus Chamados' : 'Meus Chamados'} ({myTicketsCount})
+            {isSupervisor ? 'Meus Chamados' : 'Meus Chamados'} ({getMyTicketsCount()})
+            <NotificationBadge count={getNotificationCount('my-tickets')} />
           </button>
-          
-          {!isSupervisor && (
-            <button
-              onClick={() => setActiveTab('all-tickets')}
-              className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'all-tickets'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-            </button>
-          )}
 
           {!isSupervisor && (
             <button
               onClick={() => setActiveTab('transfers')}
-              className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${
+              className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
                 activeTab === 'transfers'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
               <Share2 className="w-4 h-4 inline mr-1" />
-              Transferências ({pendingTransfers.length})
-              {pendingTransfers.length > 0 && (
-                <span className="ml-1 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full">
-                  {pendingTransfers.length}
-                </span>
-              )}
+              Transferências ({getPendingTransfersCount()})
+              <NotificationBadge count={getNotificationCount('transfers')} />
             </button>
           )}
         </nav>
@@ -569,7 +662,7 @@ const Tickets = () => {
       )}
 
       {/* Tickets List */}
-      {(activeTab === 'my-tickets' || activeTab === 'all-tickets' || activeTab === 'transfers') && (
+      {(activeTab === 'new-tickets' || activeTab === 'my-tickets' || activeTab === 'transfers') && (
         <>
           {/* Filters */}
           {activeTab !== 'transfers' && (
@@ -605,16 +698,16 @@ const Tickets = () => {
               <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
                 <Ticket className="w-12 h-12 mx-auto text-gray-400 mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  {activeTab === 'my-tickets' ? 'Nenhum chamado encontrado' : 
-                   activeTab === 'transfers' ? 'Nenhuma transferência pendente' :
-                   'Nenhum chamado encontrado'}
+                  {activeTab === 'new-tickets' ? 'Nenhum novo chamado' :
+                   activeTab === 'my-tickets' ? 'Nenhum chamado encontrado' : 
+                   'Nenhuma transferência pendente'}
                 </h3>
                 <p className="text-gray-500">
-                  {activeTab === 'my-tickets' 
+                  {activeTab === 'new-tickets' 
+                    ? 'Não há novos chamados aguardando atendimento.'
+                    : activeTab === 'my-tickets'
                     ? 'Você ainda não tem chamados.'
-                    : activeTab === 'transfers'
-                    ? 'Não há transferências pendentes para você.'
-                    : 'Não há chamados que correspondam aos filtros selecionados.'
+                    : 'Não há transferências pendentes para você.'
                   }
                 </p>
               </div>
@@ -623,6 +716,7 @@ const Tickets = () => {
                 const creator = users.find(u => u.id === ticket.createdBy);
                 const attendedBy = ticket.attendedBy ? users.find(u => u.id === ticket.attendedBy) : null;
                 const canModify = canModifyTicket(ticket);
+                const canDelete = canDeleteTicket(ticket);
                 const pendingTransfer = ticket.transfers.find(t => 
                   t.toUserId === user?.id && t.status === 'pending'
                 );
@@ -700,6 +794,7 @@ const Tickets = () => {
                             value={ticket.status}
                             onChange={(e) => handleStatusChange(ticket.id, e.target.value)}
                             className="text-sm border border-gray-300 rounded px-2 py-1"
+                            disabled={ticket.status === 'closed'}
                           >
                             <option value="in-progress">Em Andamento</option>
                             <option value="closed">Resolvido</option>
@@ -711,12 +806,17 @@ const Tickets = () => {
                             setSelectedTicket(ticket.id);
                             setIsCommentModalOpen(true);
                           }}
-                          className="text-blue-600 hover:text-blue-800 p-1"
+                          className="text-blue-600 hover:text-blue-800 p-1 relative"
                         >
                           <MessageSquare className="w-5 h-5" />
+                          {ticket.comments.length > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                              {ticket.comments.length}
+                            </span>
+                          )}
                         </button>
                         
-                        {user?.role === 'admin' && (
+                        {canDelete && (
                           <button
                             onClick={() => handleDelete(ticket.id)}
                             className="text-red-600 hover:text-red-800 p-1"
