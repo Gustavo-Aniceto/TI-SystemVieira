@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Category, Product, CalendarEvent, User, InternActivity, MovementRecord, Note, ChecklistItem, Ticket, TicketComment, TicketTransfer } from '../types';
+import { Category, Product, CalendarEvent, User, InternActivity, MovementRecord, Note, ChecklistItem, Ticket, TicketComment, TicketTransfer, Company } from '../types';
 import { generateExcel } from '../utils/excelUtils';
 import toast from 'react-hot-toast';
 
@@ -31,6 +31,12 @@ interface DataContextType {
   addUser: (user: Omit<User, 'id' | 'createdAt'>) => void;
   updateUser: (id: string, user: Partial<User>) => void;
   deleteUser: (id: string) => void;
+  
+  // Companies
+  companies: Company[];
+  addCompany: (company: Omit<Company, 'id' | 'createdAt'>) => void;
+  updateCompany: (id: string, company: Partial<Company>) => void;
+  deleteCompany: (id: string) => void;
   
   // Intern Activities
   activities: InternActivity[];
@@ -66,6 +72,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [products, setProducts] = useState<Product[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [activities, setActivities] = useState<InternActivity[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -99,6 +106,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setEvents(JSON.parse(storedEvents));
     }
 
+    // Load companies
+    const storedCompanies = localStorage.getItem('companies');
+    if (storedCompanies) {
+      setCompanies(JSON.parse(storedCompanies));
+    } else {
+      // Initialize with default companies
+      const defaultCompanies = [
+        { 
+          id: '1', 
+          name: 'Aniceto&Vieira', 
+          description: 'Empresa principal',
+          departments: ['TI', 'Administrativo', 'Operacional'],
+          createdAt: new Date().toISOString() 
+        }
+      ];
+      setCompanies(defaultCompanies);
+      localStorage.setItem('companies', JSON.stringify(defaultCompanies));
+    }
+
     // Load users
     const storedUsers = localStorage.getItem('users');
     if (storedUsers) {
@@ -112,6 +138,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name: 'Administrador',
         role: 'admin',
         email: 'admin@example.com',
+        companyId: '1',
         createdAt: new Date().toISOString()
       };
       setUsers([defaultUser]);
@@ -163,6 +190,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [users]);
 
   useEffect(() => {
+    if (companies.length > 0) {
+      localStorage.setItem('companies', JSON.stringify(companies));
+    }
+  }, [companies]);
+
+  useEffect(() => {
     if (activities.length > 0) {
       localStorage.setItem('activities', JSON.stringify(activities));
     }
@@ -211,6 +244,39 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     setCategories(categories.filter(category => category.id !== id));
     toast.success('Categoria excluída com sucesso!');
+  };
+
+  // Company operations
+  const addCompany = (company: Omit<Company, 'id' | 'createdAt'>) => {
+    const newCompany = {
+      ...company,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString()
+    };
+    setCompanies([...companies, newCompany]);
+    toast.success('Empresa adicionada com sucesso!');
+  };
+
+  const updateCompany = (id: string, companyUpdate: Partial<Company>) => {
+    setCompanies(
+      companies.map(company => 
+        company.id === id ? { ...company, ...companyUpdate } : company
+      )
+    );
+    toast.success('Empresa atualizada com sucesso!');
+  };
+
+  const deleteCompany = (id: string) => {
+    // Check if company is in use by any users
+    const isInUse = users.some(user => user.companyId === id);
+    
+    if (isInUse) {
+      toast.error('Esta empresa não pode ser excluída porque está sendo usada por usuários.');
+      return;
+    }
+    
+    setCompanies(companies.filter(company => company.id !== id));
+    toast.success('Empresa excluída com sucesso!');
   };
 
   // Product operations
@@ -703,6 +769,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addUser,
         updateUser,
         deleteUser,
+        
+        companies,
+        addCompany,
+        updateCompany,
+        deleteCompany,
         
         activities,
         addActivity,

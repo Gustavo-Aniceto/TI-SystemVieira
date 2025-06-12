@@ -9,10 +9,12 @@ interface UserFormData {
   name: string;
   email: string;
   role: 'admin' | 'user' | 'intern' | 'supervisor';
+  companyId: string;
+  department: string;
 }
 
 const Users = () => {
-  const { users, addUser, updateUser, deleteUser } = useData();
+  const { users, addUser, updateUser, deleteUser, companies } = useData();
   const { user: currentUser } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
@@ -22,7 +24,9 @@ const Users = () => {
     password: '',
     name: '',
     email: '',
-    role: 'user'
+    role: 'user',
+    companyId: '',
+    department: ''
   });
   
   const resetForm = () => {
@@ -31,7 +35,9 @@ const Users = () => {
       password: '',
       name: '',
       email: '',
-      role: 'user'
+      role: 'user',
+      companyId: companies.length > 0 ? companies[0].id : '',
+      department: ''
     });
     setCurrentUserId(null);
   };
@@ -48,7 +54,9 @@ const Users = () => {
       password: '', // Don't show the password, but let the user set a new one
       name: user.name,
       email: user.email,
-      role: user.role
+      role: user.role,
+      companyId: user.companyId || '',
+      department: user.department || ''
     });
     setCurrentUserId(user.id);
     setModalMode('edit');
@@ -122,6 +130,16 @@ const Users = () => {
     }
   };
 
+  const getCompanyName = (companyId: string) => {
+    const company = companies.find(c => c.id === companyId);
+    return company ? company.name : '-';
+  };
+
+  const getAvailableDepartments = (companyId: string) => {
+    const company = companies.find(c => c.id === companyId);
+    return company ? company.departments : [];
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -154,7 +172,10 @@ const Users = () => {
                   Função
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Data de Criação
+                  Empresa
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Setor
                 </th>
                 <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Ações
@@ -187,9 +208,10 @@ const Users = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
-                      {new Date(user.createdAt).toLocaleDateString('pt-BR')}
-                    </div>
+                    <div className="text-sm text-gray-500">{getCompanyName(user.companyId || '')}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-500">{user.department || '-'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
@@ -307,6 +329,48 @@ const Users = () => {
                     <option value="supervisor">Supervisor</option>
                     <option value="intern">Estagiário</option>
                   </select>
+                </div>
+
+                <div>
+                  <label htmlFor="companyId" className="block text-sm font-medium text-gray-700 mb-1">
+                    Empresa {formData.role === 'supervisor' ? '*' : ''}
+                  </label>
+                  <select
+                    id="companyId"
+                    name="companyId"
+                    value={formData.companyId}
+                    onChange={handleChange}
+                    required={formData.role === 'supervisor'}
+                    className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="">Selecione uma empresa</option>
+                    {companies.map((company) => (
+                      <option key={company.id} value={company.id}>
+                        {company.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="department" className="block text-sm font-medium text-gray-700 mb-1">
+                    Setor
+                  </label>
+                  <input
+                    type="text"
+                    id="department"
+                    name="department"
+                    value={formData.department}
+                    onChange={handleChange}
+                    list="departments"
+                    className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="Digite ou selecione um setor"
+                  />
+                  <datalist id="departments">
+                    {getAvailableDepartments(formData.companyId).map((dept, index) => (
+                      <option key={index} value={dept} />
+                    ))}
+                  </datalist>
                 </div>
               </div>
               

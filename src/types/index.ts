@@ -5,6 +5,16 @@ export interface User {
   name: string;
   role: 'admin' | 'user' | 'intern' | 'supervisor';
   email: string;
+  companyId?: string;
+  department?: string;
+  createdAt: string;
+}
+
+export interface Company {
+  id: string;
+  name: string;
+  description?: string;
+  departments: string[];
   createdAt: string;
 }
 

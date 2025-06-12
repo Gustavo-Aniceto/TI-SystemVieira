@@ -9,6 +9,7 @@ import Products from './pages/Products';
 import Calendar from './pages/Calendar';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
+import Companies from './pages/Companies';
 import InternActivities from './pages/InternActivities';
 import InternReview from './pages/InternReview';
 import Notes from './pages/Notes';
@@ -25,7 +26,7 @@ const ProtectedRoute = ({ children, roles }: { children: React.ReactNode, roles?
   }
   
   if (roles && !roles.includes(user.role)) {
-    return <Navigate to="/tickets\" replace />;
+    return <Navigate to="/tickets" replace />;
   }
   
   return <>{children}</>;
@@ -45,7 +46,7 @@ const AuthenticatedApp = () => {
   const { user } = useAuth();
   
   if (!user) {
-    return <Navigate to="/login\" replace />;
+    return <Navigate to="/login" replace />;
   }
   
   return (
@@ -83,13 +84,18 @@ const AuthenticatedApp = () => {
             <Users />
           </ProtectedRoute>
         } />
+        <Route path="companies" element={
+          <ProtectedRoute roles={['admin']}>
+            <Companies />
+          </ProtectedRoute>
+        } />
         <Route path="intern-activities" element={
           <ProtectedRoute roles={['intern']}>
             <InternActivities />
           </ProtectedRoute>
         } />
         <Route path="intern-review" element={
-          <ProtectedRoute roles={['admin']}>
+          <ProtectedRoute roles={['admin', 'user']}>
             <InternReview />
           </ProtectedRoute>
         } />
