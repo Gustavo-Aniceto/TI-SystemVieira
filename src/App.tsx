@@ -13,6 +13,7 @@ import Companies from './pages/Companies';
 import InternActivities from './pages/InternActivities';
 import InternReview from './pages/InternReview';
 import Notes from './pages/Notes';
+import PasswordManager from './pages/PasswordManager';
 import Tickets from './pages/Tickets';
 import NotFound from './pages/NotFound';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -76,6 +77,11 @@ const AuthenticatedApp = () => {
         <Route path="notes" element={
           <ProtectedRoute roles={['admin', 'user', 'intern']}>
             <Notes />
+          </ProtectedRoute>
+        } />
+        <Route path="password-manager" element={
+          <ProtectedRoute roles={['admin', 'user', 'intern']}>
+            <PasswordManager />
           </ProtectedRoute>
         } />
         <Route path="tickets" element={<Tickets />} />
