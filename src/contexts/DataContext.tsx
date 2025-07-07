@@ -230,6 +230,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (passwords.length > 0) {
       localStorage.setItem('passwords', JSON.stringify(passwords));
     }
+  }, [passwords]);
 
   // Category operations
   const addCategory = (category: Omit<Category, 'id'>) => {
