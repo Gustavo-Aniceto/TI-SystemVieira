@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Category, Product, CalendarEvent, User, InternActivity, MovementRecord, Note, ChecklistItem, Ticket, TicketComment, TicketTransfer, Company } from '../types';
+import { Category, Product, CalendarEvent, User, InternActivity, MovementRecord, Note, ChecklistItem, Ticket, TicketComment, TicketTransfer, Company, PasswordEntry } from '../types';
 import { generateExcel } from '../utils/excelUtils';
 import toast from 'react-hot-toast';
 
@@ -50,6 +50,12 @@ interface DataContextType {
   updateNote: (id: string, note: Partial<Note>) => void;
   deleteNote: (id: string) => void;
   
+  // Password Manager
+  passwords: PasswordEntry[];
+  addPassword: (password: Omit<PasswordEntry, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updatePassword: (id: string, password: Partial<PasswordEntry>) => void;
+  deletePassword: (id: string) => void;
+  
   // Reports
   generateReport: (type: string, filters: any) => void;
 
@@ -76,6 +82,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [activities, setActivities] = useState<InternActivity[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [passwords, setPasswords] = useState<PasswordEntry[]>([]);
 
   // Load initial data
   useEffect(() => {
@@ -162,6 +169,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (storedTickets) {
       setTickets(JSON.parse(storedTickets));
     }
+
+    // Load passwords
+    const storedPasswords = localStorage.getItem('passwords');
+    if (storedPasswords) {
+      setPasswords(JSON.parse(storedPasswords));
+    }
   }, []);
 
   // Save data whenever it changes
@@ -212,6 +225,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('tickets', JSON.stringify(tickets));
     }
   }, [tickets]);
+
+  useEffect(() => {
+    if (passwords.length > 0) {
+      localStorage.setItem('passwords', JSON.stringify(passwords));
+    }
 
   // Category operations
   const addCategory = (category: Omit<Category, 'id'>) => {
@@ -470,6 +488,39 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const deleteNote = (id: string) => {
     setNotes(notes.filter(note => note.id !== id));
     toast.success('Anotação excluída com sucesso!');
+  };
+
+  // Password operations
+  const addPassword = (password: Omit<PasswordEntry, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const now = new Date().toISOString();
+    const newPassword = {
+      ...password,
+      id: Date.now().toString(),
+      createdAt: now,
+      updatedAt: now
+    };
+    setPasswords([...passwords, newPassword]);
+    toast.success('Senha adicionada com sucesso!');
+  };
+
+  const updatePassword = (id: string, passwordUpdate: Partial<PasswordEntry>) => {
+    setPasswords(
+      passwords.map(password => 
+        password.id === id 
+          ? { 
+              ...password, 
+              ...passwordUpdate, 
+              updatedAt: new Date().toISOString() 
+            } 
+          : password
+      )
+    );
+    toast.success('Senha atualizada com sucesso!');
+  };
+
+  const deletePassword = (id: string) => {
+    setPasswords(passwords.filter(password => password.id !== id));
+    toast.success('Senha excluída com sucesso!');
   };
 
   // Ticket operations
@@ -784,6 +835,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addNote,
         updateNote,
         deleteNote,
+        
+        passwords,
+        addPassword,
+        updatePassword,
+        deletePassword,
         
         generateReport,
 

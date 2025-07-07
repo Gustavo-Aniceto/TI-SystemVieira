@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
@@ -15,7 +15,13 @@ import {
   UserCheck,
   StickyNote,
   Ticket,
-  Building2
+  Building2,
+  ChevronDown,
+  ChevronRight,
+  Settings,
+  Wrench,
+  Archive,
+  Key
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -24,6 +30,13 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const { getLowStockProducts } = useData();
   const location = useLocation();
   const navigate = useNavigate();
+  
+  // State for dropdown menus
+  const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({
+    estoque: false,
+    configuracoes: false,
+    tools: false
+  });
   
   // Check for low stock products on initial load
   useEffect(() => {
@@ -52,12 +65,40 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     navigate('/login');
   };
 
-  const NavItem = ({ to, icon, label }: { to: string, icon: React.ReactNode, label: string }) => {
-    const isActive = location.pathname === to;
+  const toggleDropdown = (section: string) => {
+    setOpenDropdowns(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  const NavItem = ({ to, icon, label, onClick }: { 
+    to?: string, 
+    icon: React.ReactNode, 
+    label: string,
+    onClick?: () => void 
+  }) => {
+    const isActive = to ? location.pathname === to : false;
+    
+    if (onClick) {
+      return (
+        <button
+          onClick={onClick}
+          className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors text-left ${
+            isActive 
+              ? 'bg-blue-100 text-blue-700' 
+              : 'text-gray-700 hover:bg-gray-100'
+          }`}
+        >
+          <span className="mr-3">{icon}</span>
+          <span className="flex-1">{label}</span>
+        </button>
+      );
+    }
     
     return (
       <Link
-        to={to}
+        to={to!}
         className={`flex items-center px-4 py-3 rounded-lg transition-colors ${
           isActive 
             ? 'bg-blue-100 text-blue-700' 
@@ -65,6 +106,61 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         }`}
       >
         <span className="mr-3">{icon}</span>
+        <span>{label}</span>
+      </Link>
+    );
+  };
+
+  const DropdownSection = ({ 
+    title, 
+    icon, 
+    sectionKey, 
+    children 
+  }: { 
+    title: string, 
+    icon: React.ReactNode, 
+    sectionKey: string, 
+    children: React.ReactNode 
+  }) => {
+    const isOpen = openDropdowns[sectionKey];
+    
+    return (
+      <div className="space-y-1">
+        <button
+          onClick={() => toggleDropdown(sectionKey)}
+          className="flex items-center w-full px-4 py-3 rounded-lg transition-colors text-gray-700 hover:bg-gray-100"
+        >
+          <span className="mr-3">{icon}</span>
+          <span className="flex-1 text-left">{title}</span>
+          {isOpen ? (
+            <ChevronDown className="w-4 h-4" />
+          ) : (
+            <ChevronRight className="w-4 h-4" />
+          )}
+        </button>
+        
+        {isOpen && (
+          <div className="ml-6 space-y-1">
+            {children}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const SubNavItem = ({ to, icon, label }: { to: string, icon: React.ReactNode, label: string }) => {
+    const isActive = location.pathname === to;
+    
+    return (
+      <Link
+        to={to}
+        className={`flex items-center px-4 py-2 rounded-lg transition-colors text-sm ${
+          isActive 
+            ? 'bg-blue-100 text-blue-700' 
+            : 'text-gray-600 hover:bg-gray-100'
+        }`}
+      >
+        <span className="mr-2">{icon}</span>
         <span>{label}</span>
       </Link>
     );
@@ -78,27 +174,65 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           <p className="text-sm text-gray-500">Sistema de Estoque TI</p>
         </div>
         
-        <nav className="flex-1 space-y-1">
+        <nav className="flex-1 space-y-2">
+          {/* Dashboard */}
           {!isSupervisor && <NavItem to="/" icon={<LayoutGrid size={20} />} label="Dashboard" />}
-          {!isIntern && !isSupervisor && (
-            <>
-              <NavItem to="/categories" icon={<Layers size={20} />} label="Categorias" />
-              <NavItem to="/products" icon={<Package size={20} />} label="Produtos" />
-            </>
-          )}
-          {!isSupervisor && <NavItem to="/calendar" icon={<CalendarIcon size={20} />} label="Calendário" />}
+          
+          {/* Chamados */}
           <NavItem to="/tickets" icon={<Ticket size={20} />} label="Chamados" />
-          {!isSupervisor && <NavItem to="/notes" icon={<StickyNote size={20} />} label="Anotações" />}
-          {!isIntern && !isSupervisor && (
-            <NavItem to="/reports" icon={<FileText size={20} />} label="Relatórios" />
+          
+          {/* Estoque */}
+          {!isSupervisor && (
+            <DropdownSection 
+              title="Estoque" 
+              icon={<Archive size={20} />} 
+              sectionKey="estoque"
+            >
+              {!isIntern && (
+                <>
+                  <SubNavItem to="/categories" icon={<Layers size={16} />} label="Categorias" />
+                  <SubNavItem to="/products" icon={<Package size={16} />} label="Produtos" />
+                </>
+              )}
+              {(isAdmin || (!isIntern && !isSupervisor)) && (
+                <SubNavItem to="/intern-review" icon={<UserCheck size={16} />} label="Revisão de Estagiários" />
+              )}
+            </DropdownSection>
           )}
-          {isAdmin && <NavItem to="/users" icon={<Users size={20} />} label="Usuários" />}
-          {isAdmin && <NavItem to="/companies" icon={<Building2 size={20} />} label="Empresas" />}
+          
+          {/* Configurações */}
+          <DropdownSection 
+            title="Configurações" 
+            icon={<Settings size={20} />} 
+            sectionKey="configuracoes"
+          >
+            {!isIntern && !isSupervisor && (
+              <SubNavItem to="/reports" icon={<FileText size={16} />} label="Relatórios" />
+            )}
+            {isAdmin && (
+              <>
+                <SubNavItem to="/users" icon={<Users size={16} />} label="Usuários" />
+                <SubNavItem to="/companies" icon={<Building2 size={16} />} label="Empresas" />
+              </>
+            )}
+          </DropdownSection>
+          
+          {/* Tools */}
+          {!isSupervisor && (
+            <DropdownSection 
+              title="Tools" 
+              icon={<Wrench size={20} />} 
+              sectionKey="tools"
+            >
+              <SubNavItem to="/calendar" icon={<CalendarIcon size={16} />} label="Calendário" />
+              <SubNavItem to="/notes" icon={<StickyNote size={16} />} label="Anotações" />
+              <SubNavItem to="/password-manager" icon={<Key size={16} />} label="Gerenciador de Senhas" />
+            </DropdownSection>
+          )}
+          
+          {/* Intern Activities */}
           {isIntern && (
             <NavItem to="/intern-activities" icon={<ClipboardList size={20} />} label="Minhas Atividades" />
-          )}
-          {(isAdmin || (!isIntern && !isSupervisor)) && (
-            <NavItem to="/intern-review" icon={<UserCheck size={20} />} label="Revisão de Estagiários" />
           )}
         </nav>
         

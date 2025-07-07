@@ -116,6 +116,19 @@ export interface ChecklistItem {
   createdAt: string;
 }
 
+export interface PasswordEntry {
+  id: string;
+  title: string;
+  username: string;
+  password: string;
+  website?: string;
+  notes?: string;
+  category: 'work' | 'personal' | 'social' | 'financial' | 'other';
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface TicketAttachment {
   id: string;
   name: string;
