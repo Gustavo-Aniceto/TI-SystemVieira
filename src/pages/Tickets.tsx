@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -29,6 +30,7 @@ interface TicketFormData {
 const Tickets = () => {
   const { tickets, addTicket, updateTicket, addTicketComment, transferTicket, respondToTransfer, users, companies } = useData();
   const { user, isAdmin, isSupervisor } = useAuth();
+  const location = useLocation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<string | null>(null);
   const [commentText, setCommentText] = useState('');
@@ -51,13 +53,22 @@ const Tickets = () => {
     anydeskAccess: ''
   });
 
+  // Get status filter from URL
+  const urlParams = new URLSearchParams(location.search);
+  const statusFilter = urlParams.get('status');
+
   // Filter tickets based on user role
-  const filteredTickets = tickets.filter(ticket => {
+  let filteredTickets = tickets.filter(ticket => {
     if (isSupervisor) {
       return ticket.createdBy === user?.id;
     }
     return true; // Admins and users can see all tickets
   });
+
+  // Apply status filter if present in URL
+  if (statusFilter) {
+    filteredTickets = filteredTickets.filter(ticket => ticket.status === statusFilter);
+  }
 
   const resetForm = () => {
     setFormData({

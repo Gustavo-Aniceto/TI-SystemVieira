@@ -107,7 +107,10 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
         <MetricCard
           title="Computadores"
-          value={products.filter(p => p.categoryId === categories.find(c => c.name.toLowerCase().includes('hardware'))?.id).length}
+          value={products.filter(p => {
+            const category = categories.find(c => c.id === p.categoryId);
+            return category?.name.toLowerCase().includes('hardware') || category?.name.toLowerCase().includes('computador');
+          }).length}
           icon={<Monitor className="h-8 w-8" />}
           bgColor="bg-gradient-to-br from-red-400 to-red-500"
           link="/products"
@@ -115,7 +118,10 @@ const Dashboard = () => {
         
         <MetricCard
           title="Software"
-          value={products.filter(p => p.categoryId === categories.find(c => c.name.toLowerCase().includes('software'))?.id).length}
+          value={products.filter(p => {
+            const category = categories.find(c => c.id === p.categoryId);
+            return category?.name.toLowerCase().includes('software');
+          }).length}
           icon={<Package className="h-8 w-8" />}
           bgColor="bg-gradient-to-br from-green-400 to-green-500"
           link="/products"
@@ -123,7 +129,10 @@ const Dashboard = () => {
         
         <MetricCard
           title="Dispositivos de Rede"
-          value={products.filter(p => p.categoryId === categories.find(c => c.name.toLowerCase().includes('rede'))?.id).length}
+          value={products.filter(p => {
+            const category = categories.find(c => c.id === p.categoryId);
+            return category?.name.toLowerCase().includes('rede');
+          }).length}
           icon={<Layers className="h-8 w-8" />}
           bgColor="bg-gradient-to-br from-blue-400 to-blue-500"
           link="/products"
@@ -153,7 +162,7 @@ const Dashboard = () => {
           value={ticketStats.open}
           icon={<Ticket className="h-8 w-8" />}
           bgColor="bg-gradient-to-br from-red-500 to-red-600"
-          link="/tickets"
+          link="/tickets?status=open"
         />
         
         <MetricCard
@@ -161,7 +170,7 @@ const Dashboard = () => {
           value={ticketStats.inProgress}
           icon={<Clock className="h-8 w-8" />}
           bgColor="bg-gradient-to-br from-yellow-500 to-yellow-600"
-          link="/tickets"
+          link="/tickets?status=in-progress"
         />
         
         <MetricCard
@@ -169,7 +178,7 @@ const Dashboard = () => {
           value={ticketStats.resolved}
           icon={<CheckCircle className="h-8 w-8" />}
           bgColor="bg-gradient-to-br from-blue-500 to-blue-600"
-          link="/tickets"
+          link="/tickets?status=resolved"
         />
         
         <MetricCard
@@ -177,7 +186,7 @@ const Dashboard = () => {
           value={users.length}
           icon={<Users className="h-8 w-8" />}
           bgColor="bg-gradient-to-br from-purple-500 to-purple-600"
-          link="/users"
+          link={isAdmin ? "/users" : undefined}
         />
         
         <MetricCard
@@ -185,7 +194,7 @@ const Dashboard = () => {
           value={companies.length}
           icon={<Building2 className="h-8 w-8" />}
           bgColor="bg-gradient-to-br from-indigo-500 to-indigo-600"
-          link="/companies"
+          link={isAdmin ? "/companies" : undefined}
         />
       </div>
       
