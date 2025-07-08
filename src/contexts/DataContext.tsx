@@ -434,23 +434,71 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Intern Activity operations
-  const addActivity = (activity: Omit<InternActivity, 'id' | 'createdAt'>) => {
+  const addActivity = (activity: Omit<InternActivity, 'id' | 'createdAt' | 'startDate'>) => {
     const newActivity = {
       ...activity,
       id: Date.now().toString(),
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      startDate: new Date().toISOString(),
+      status: 'in-progress' as const
     };
     setActivities([...activities, newActivity]);
-    toast.success('Atividade registrada com sucesso!');
+    toast.success('Atividade iniciada com sucesso!');
   };
 
   const updateActivity = (id: string, activityUpdate: Partial<InternActivity>) => {
+    const now = new Date().toISOString();
+    let updatedActivity = { ...activityUpdate };
+    
+    // Calculate duration when completing activity
+    if (activityUpdate.status === 'completed') {
+      const activity = activities.find(a => a.id === id);
+      if (activity && activity.startDate) {
+        const startTime = new Date(activity.startDate).getTime();
+        const endTime = new Date(now).getTime();
+        const durationMinutes = Math.round((endTime - startTime) / (1000 * 60));
+        updatedActivity = {
+          ...updatedActivity,
+          endDate: now,
+          completedAt: now,
+          duration: durationMinutes
+        };
+      }
+    }
+    
+    // Set submission time when submitting for review
+    if (activityUpdate.status === 'pending-review') {
+      updatedActivity = {
+        ...updatedActivity,
+        submittedAt: now
+      };
+    }
+    
+    // Set review time when approving/rejecting
+    if (activityUpdate.status === 'approved' || activityUpdate.status === 'rejected') {
+      updatedActivity = {
+        ...updatedActivity,
+        reviewedAt: now
+      };
+    }
+    
     setActivities(
       activities.map(activity => 
-        activity.id === id ? { ...activity, ...activityUpdate } : activity
+        activity.id === id ? { ...activity, ...updatedActivity } : activity
       )
     );
-    toast.success('Atividade atualizada com sucesso!');
+    
+    if (activityUpdate.status === 'completed') {
+      toast.success('Atividade finalizada com sucesso!');
+    } else if (activityUpdate.status === 'pending-review') {
+      toast.success('Atividade enviada para revisão!');
+    } else if (activityUpdate.status === 'approved') {
+      toast.success('Atividade aprovada!');
+    } else if (activityUpdate.status === 'rejected') {
+      toast.success('Atividade rejeitada!');
+    } else {
+      toast.success('Atividade atualizada com sucesso!');
+    }
   };
 
   const deleteActivity = (id: string) => {
@@ -542,12 +590,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateTicket = (id: string, ticketUpdate: Partial<Ticket>) => {
+    const now = new Date().toISOString();
+    let updatedTicket = { ...ticketUpdate };
+    
+    // Calculate response time when ticket is first attended
+    if (ticketUpdate.attendedBy && !tickets.find(t => t.id === id)?.attendedBy) {
+      const ticket = tickets.find(t => t.id === id);
+      if (ticket) {
+        const createdTime = new Date(ticket.createdAt).getTime();
+        const attendedTime = new Date(now).getTime();
+        const responseTimeMinutes = Math.round((attendedTime - createdTime) / (1000 * 60));
+        updatedTicket = {
+          ...updatedTicket,
+          responseTime: responseTimeMinutes,
+          attendedAt: now
+        };
+      }
+    }
+    
     setTickets(
       tickets.map(ticket =>
         ticket.id === id
           ? {
               ...ticket,
-              ...ticketUpdate,
+              ...updatedTicket,
               updatedAt: new Date().toISOString()
             }
           : ticket

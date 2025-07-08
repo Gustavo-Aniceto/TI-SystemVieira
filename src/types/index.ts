@@ -87,13 +87,18 @@ export interface CalendarEvent {
 export interface InternActivity {
   id: string;
   internId: string;
-  date: string;
+  startDate: string;
+  endDate?: string;
   description: string;
   category: 'maintenance' | 'support' | 'inventory' | 'other';
-  hours: number;
-  status: 'pending' | 'approved' | 'rejected';
+  duration?: number; // in minutes
+  status: 'in-progress' | 'completed' | 'pending-review' | 'approved' | 'rejected';
   feedback?: string;
+  rejectionReason?: string;
   createdAt: string;
+  completedAt?: string;
+  submittedAt?: string;
+  reviewedAt?: string;
 }
 
 export interface Note {
@@ -160,6 +165,7 @@ export interface Ticket {
   assignedTo?: string;
   attendedBy?: string;
   attendedAt?: string;
+  responseTime?: number; // in minutes
   closedAt?: string;
   closingFeedback?: string;
   attachments: TicketAttachment[];

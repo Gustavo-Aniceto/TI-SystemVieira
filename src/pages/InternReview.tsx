@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useData } from '../contexts/DataContext';
-import { Check, X as XIcon, MessageSquare, Filter, FileText } from 'lucide-react';
+import { Check, X as XIcon, MessageSquare, Filter, FileText, Clock, AlertCircle } from 'lucide-react';
 
 const InternReview = () => {
   const { activities, users, updateActivity, generateReport } = useData();
@@ -13,11 +13,13 @@ const InternReview = () => {
     isOpen: boolean;
     activityId: string;
     feedback: string;
+    rejectionReason: string;
     action: 'approve' | 'reject';
   }>({
     isOpen: false,
     activityId: '',
     feedback: '',
+    rejectionReason: '',
     action: 'approve'
   });
 
@@ -27,8 +29,8 @@ const InternReview = () => {
     if (filterIntern && activity.internId !== filterIntern) return false;
     if (filterCategory && activity.category !== filterCategory) return false;
     if (filterStatus && activity.status !== filterStatus) return false;
-    if (filterStartDate && new Date(activity.date) < new Date(filterStartDate)) return false;
-    if (filterEndDate && new Date(activity.date) > new Date(filterEndDate)) return false;
+    if (filterStartDate && new Date(activity.startDate) < new Date(filterStartDate)) return false;
+    if (filterEndDate && new Date(activity.startDate) > new Date(filterEndDate)) return false;
     return true;
   });
 
@@ -37,17 +39,37 @@ const InternReview = () => {
       isOpen: true,
       activityId,
       feedback: '',
+      rejectionReason: '',
       action
     });
   };
 
   const handleFeedbackSubmit = () => {
-    const { activityId, feedback, action } = feedbackModal;
-    updateActivity(activityId, {
+    const { activityId, feedback, rejectionReason, action } = feedbackModal;
+    const updateData: any = {
       status: action === 'approve' ? 'approved' : 'rejected',
-      feedback
+      feedback: action === 'approve' ? feedback : undefined,
+      rejectionReason: action === 'reject' ? rejectionReason : undefined
+    };
+    
+    updateActivity(activityId, updateData);
+    setFeedbackModal({ 
+      isOpen: false, 
+      activityId: '', 
+      feedback: '', 
+      rejectionReason: '', 
+      action: 'approve' 
     });
-    setFeedbackModal({ isOpen: false, activityId: '', feedback: '', action: 'approve' });
+  };
+
+  const formatDuration = (minutes: number | undefined): string => {
+    if (!minutes) return '-';
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours > 0) {
+      return `${hours}h ${mins}m`;
+    }
+    return `${mins}m`;
   };
 
   const generateActivityReport = () => {
@@ -68,7 +90,7 @@ const InternReview = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Revisão de Atividades</h1>
           <p className="mt-1 text-sm text-gray-600">
-            Gerencie e avalie as atividades dos estagiários
+            Gerencie e avalie as atividades dos estagiários com controle de tempo automático
           </p>
         </div>
         <button
@@ -128,9 +150,11 @@ const InternReview = () => {
               className="block w-full rounded-md border border-gray-300 py-2 px-3 text-sm"
             >
               <option value="">Todos</option>
-              <option value="pending">Pendente</option>
-              <option value="approved">Aprovado</option>
-              <option value="rejected">Rejeitado</option>
+              <option value="in-progress">Em Andamento</option>
+              <option value="completed">Finalizada</option>
+              <option value="pending-review">Aguardando Revisão</option>
+              <option value="approved">Aprovada</option>
+              <option value="rejected">Rejeitada</option>
             </select>
           </div>
 
@@ -186,7 +210,7 @@ const InternReview = () => {
                   Estagiário
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Data
+                  Data/Hora Início
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Categoria
@@ -195,7 +219,7 @@ const InternReview = () => {
                   Descrição
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Horas
+                  Duração
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
@@ -210,12 +234,15 @@ const InternReview = () => {
                 const intern = users.find(u => u.id === activity.internId);
                 
                 return (
-                  <tr key={activity.id}>
+                  <tr key={activity.id} className={activity.status === 'pending-review' ? 'bg-yellow-50' : ''}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {intern?.name || 'Usuário Removido'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(activity.date).toLocaleDateString('pt-BR')}
+                      <div>{new Date(activity.startDate).toLocaleDateString('pt-BR')}</div>
+                      <div className="text-xs text-gray-500">
+                        {new Date(activity.startDate).toLocaleTimeString('pt-BR')}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -230,38 +257,68 @@ const InternReview = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">
-                      {activity.description}
+                      <div className="max-w-xs truncate">{activity.description}</div>
                       {activity.feedback && (
-                        <div className="mt-1 text-xs text-gray-500">
+                        <div className="mt-1 text-xs text-green-600">
                           <strong>Feedback:</strong> {activity.feedback}
+                        </div>
+                      )}
+                      {activity.rejectionReason && (
+                        <div className="mt-1 text-xs text-red-600">
+                          <strong>Motivo da rejeição:</strong> {activity.rejectionReason}
+                        </div>
+                      )}
+                      {activity.submittedAt && (
+                        <div className="mt-1 text-xs text-gray-500">
+                          <strong>Enviado em:</strong> {new Date(activity.submittedAt).toLocaleString('pt-BR')}
                         </div>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {activity.hours}h
+                      <div className="flex items-center">
+                        <Clock className="w-4 h-4 mr-1 text-gray-400" />
+                        {formatDuration(activity.duration)}
+                      </div>
+                      {activity.endDate && (
+                        <div className="text-xs text-gray-500">
+                          Finalizada: {new Date(activity.endDate).toLocaleTimeString('pt-BR')}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        activity.status === 'approved' ? 'bg-green-100 text-green-800' :
-                        activity.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {activity.status === 'approved' ? 'Aprovado' :
-                         activity.status === 'rejected' ? 'Rejeitado' : 'Pendente'}
-                      </span>
+                      <div className="flex items-center">
+                        {activity.status === 'pending-review' && (
+                          <AlertCircle className="w-4 h-4 mr-1 text-yellow-500" />
+                        )}
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          activity.status === 'approved' ? 'bg-green-100 text-green-800' :
+                          activity.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                          activity.status === 'pending-review' ? 'bg-yellow-100 text-yellow-800' :
+                          activity.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                          'bg-purple-100 text-purple-800'
+                        }`}>
+                          {activity.status === 'approved' ? 'Aprovada' :
+                           activity.status === 'rejected' ? 'Rejeitada' :
+                           activity.status === 'pending-review' ? 'Aguardando Revisão' :
+                           activity.status === 'completed' ? 'Finalizada' :
+                           'Em Andamento'}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      {activity.status === 'pending' && (
+                      {activity.status === 'pending-review' && (
                         <div className="flex justify-end space-x-2">
                           <button
                             onClick={() => handleStatusChange(activity.id, 'approve')}
                             className="text-green-600 hover:text-green-900"
+                            title="Aprovar atividade"
                           >
                             <Check className="w-5 h-5" />
                           </button>
                           <button
                             onClick={() => handleStatusChange(activity.id, 'reject')}
                             className="text-red-600 hover:text-red-900"
+                            title="Rejeitar atividade"
                           >
                             <XIcon className="w-5 h-5" />
                           </button>
@@ -285,7 +342,13 @@ const InternReview = () => {
                 {feedbackModal.action === 'approve' ? 'Aprovar' : 'Rejeitar'} Atividade
               </h2>
               <button
-                onClick={() => setFeedbackModal({ isOpen: false, activityId: '', feedback: '', action: 'approve' })}
+                onClick={() => setFeedbackModal({ 
+                  isOpen: false, 
+                  activityId: '', 
+                  feedback: '', 
+                  rejectionReason: '', 
+                  action: 'approve' 
+                })}
                 className="text-gray-400 hover:text-gray-500"
               >
                 <XIcon className="w-6 h-6" />
@@ -293,34 +356,58 @@ const InternReview = () => {
             </div>
             
             <div className="space-y-4">
-              <div>
-                <label htmlFor="feedback" className="block text-sm font-medium text-gray-700 mb-1">
-                  Feedback
-                </label>
-                <textarea
-                  id="feedback"
-                  value={feedbackModal.feedback}
-                  onChange={(e) => setFeedbackModal(prev => ({ ...prev, feedback: e.target.value }))}
-                  rows={4}
-                  className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder="Digite seu feedback..."
-                ></textarea>
-              </div>
+              {feedbackModal.action === 'approve' ? (
+                <div>
+                  <label htmlFor="feedback" className="block text-sm font-medium text-gray-700 mb-1">
+                    Feedback (opcional)
+                  </label>
+                  <textarea
+                    id="feedback"
+                    value={feedbackModal.feedback}
+                    onChange={(e) => setFeedbackModal(prev => ({ ...prev, feedback: e.target.value }))}
+                    rows={4}
+                    className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="Digite um feedback positivo para o estagiário..."
+                  ></textarea>
+                </div>
+              ) : (
+                <div>
+                  <label htmlFor="rejectionReason" className="block text-sm font-medium text-gray-700 mb-1">
+                    Motivo da Rejeição *
+                  </label>
+                  <textarea
+                    id="rejectionReason"
+                    value={feedbackModal.rejectionReason}
+                    onChange={(e) => setFeedbackModal(prev => ({ ...prev, rejectionReason: e.target.value }))}
+                    rows={4}
+                    required
+                    className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="Explique o que precisa ser corrigido na atividade..."
+                  ></textarea>
+                </div>
+              )}
               
               <div className="flex justify-end space-x-3">
                 <button
-                  onClick={() => setFeedbackModal({ isOpen: false, activityId: '', feedback: '', action: 'approve' })}
+                  onClick={() => setFeedbackModal({ 
+                    isOpen: false, 
+                    activityId: '', 
+                    feedback: '', 
+                    rejectionReason: '', 
+                    action: 'approve' 
+                  })}
                   className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleFeedbackSubmit}
+                  disabled={feedbackModal.action === 'reject' && !feedbackModal.rejectionReason.trim()}
                   className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
                     feedbackModal.action === 'approve'
                       ? 'bg-green-600 hover:bg-green-700'
                       : 'bg-red-600 hover:bg-red-700'
-                  }`}
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   {feedbackModal.action === 'approve' ? 'Aprovar' : 'Rejeitar'}
                 </button>
