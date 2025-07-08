@@ -207,9 +207,9 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             sectionKey="configuracoes"
           >
             {!isIntern && !isSupervisor && (
-              {isAdmin && (
+              isAdmin && (
                 <SubNavItem to="/reports" icon={<FileText size={16} />} label="Relatórios" />
-              )}
+              )
             )}
             {isAdmin && (
               <>
