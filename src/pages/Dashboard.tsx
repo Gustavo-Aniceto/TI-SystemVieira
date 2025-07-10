@@ -19,7 +19,7 @@ import {
 
 const Dashboard = () => {
   const { products, categories, events, tickets, users, companies, getLowStockProducts } = useData();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [lowStockProducts, setLowStockProducts] = useState<typeof products>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<typeof events>([]);
   const [ticketStats, setTicketStats] = useState({
