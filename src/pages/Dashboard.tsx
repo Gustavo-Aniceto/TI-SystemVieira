@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Monitor, 
   Package, 
@@ -20,6 +20,7 @@ import {
 const Dashboard = () => {
   const { products, categories, events, tickets, users, companies, getLowStockProducts } = useData();
   const { user, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [lowStockProducts, setLowStockProducts] = useState<typeof products>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<typeof events>([]);
   const [ticketStats, setTicketStats] = useState({
@@ -186,7 +187,7 @@ const Dashboard = () => {
           value={users.length}
           icon={<Users className="h-8 w-8" />}
           bgColor="bg-gradient-to-br from-purple-500 to-purple-600"
-          link={isAdmin ? "/users" : undefined}
+          link="/users"
         />
         
         <MetricCard
@@ -194,14 +195,14 @@ const Dashboard = () => {
           value={companies.length}
           icon={<Building2 className="h-8 w-8" />}
           bgColor="bg-gradient-to-br from-indigo-500 to-indigo-600"
-          link={isAdmin ? "/companies" : undefined}
+          link="/companies"
         />
       </div>
       
       {/* Quick Actions and Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Low Stock Products */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow duration-300">
           <div className="border-b border-gray-200 px-6 py-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
@@ -209,7 +210,7 @@ const Dashboard = () => {
                 Produtos com Estoque Baixo
               </h2>
               {lowStockProducts.length > 0 && (
-                <Link to="/products?filter=lowstock" className="text-sm text-blue-600 hover:text-blue-800">
+                <Link to="/products?filter=lowstock" className="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors">
                   Ver todos
                 </Link>
               )}
@@ -227,16 +228,16 @@ const Dashboard = () => {
                   const category = categories.find(c => c.id === product.categoryId);
                   
                   return (
-                    <div key={product.id} className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
+                    <div key={product.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200 hover:border-amber-300 transition-all duration-200">
                       <div className="flex-1">
-                        <h4 className="text-sm font-medium text-gray-900">{product.name}</h4>
+                        <h4 className="text-sm font-semibold text-gray-900">{product.name}</h4>
                         <p className="text-xs text-gray-500">{category?.name || 'Sem categoria'}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-medium text-amber-700">
+                        <p className="text-sm font-bold text-amber-700">
                           {product.quantity} / {product.minQuantity}
                         </p>
-                        <p className="text-xs text-amber-600">Estoque baixo</p>
+                        <p className="text-xs text-amber-600 font-medium">Estoque baixo</p>
                       </div>
                     </div>
                   );
@@ -254,7 +255,7 @@ const Dashboard = () => {
         </div>
         
         {/* Upcoming Events */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow duration-300">
           <div className="border-b border-gray-200 px-6 py-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
@@ -262,7 +263,7 @@ const Dashboard = () => {
                 Próximos Eventos
               </h2>
               {upcomingEvents.length > 0 && (
-                <Link to="/calendar" className="text-sm text-blue-600 hover:text-blue-800">
+                <Link to="/calendar" className="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors">
                   Ver calendário
                 </Link>
               )}
@@ -277,13 +278,13 @@ const Dashboard = () => {
             ) : (
               <div className="space-y-4">
                 {upcomingEvents.slice(0, 5).map((event) => (
-                  <div key={event.id} className="flex items-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div key={event.id} className="flex items-center p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 hover:border-blue-300 transition-all duration-200">
                     <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-900">{event.title}</h4>
+                      <h4 className="text-sm font-semibold text-gray-900">{event.title}</h4>
                       <p className="text-xs text-gray-500">{event.description}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-medium text-blue-700">
+                      <p className="text-sm font-bold text-blue-700">
                         {new Date(event.startDate).toLocaleDateString('pt-BR')}
                       </p>
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
@@ -316,35 +317,35 @@ const Dashboard = () => {
       </div>
 
       {/* Recent Tickets Summary */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow duration-300">
         <div className="border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center">
               <TrendingUp className="w-5 h-5 text-green-500 mr-2" />
               Resumo de Chamados
             </h2>
-            <Link to="/tickets" className="text-sm text-blue-600 hover:text-blue-800">
+            <Link to="/tickets" className="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors">
               Ver todos os chamados
             </Link>
           </div>
         </div>
         <div className="p-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-red-50 rounded-lg">
-              <div className="text-2xl font-bold text-red-600">{ticketStats.open}</div>
-              <div className="text-sm text-red-700">Abertos</div>
+            <div className="text-center p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-lg hover:shadow-md transition-all duration-200 cursor-pointer" onClick={() => navigate('/tickets?status=open')}>
+              <div className="text-3xl font-bold text-red-600 mb-1">{ticketStats.open}</div>
+              <div className="text-sm font-medium text-red-700">Abertos</div>
             </div>
-            <div className="text-center p-4 bg-yellow-50 rounded-lg">
-              <div className="text-2xl font-bold text-yellow-600">{ticketStats.inProgress}</div>
-              <div className="text-sm text-yellow-700">Em Andamento</div>
+            <div className="text-center p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg hover:shadow-md transition-all duration-200 cursor-pointer" onClick={() => navigate('/tickets?status=in-progress')}>
+              <div className="text-3xl font-bold text-yellow-600 mb-1">{ticketStats.inProgress}</div>
+              <div className="text-sm font-medium text-yellow-700">Em Andamento</div>
             </div>
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">{ticketStats.resolved}</div>
-              <div className="text-sm text-blue-700">Resolvidos</div>
+            <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg hover:shadow-md transition-all duration-200 cursor-pointer" onClick={() => navigate('/tickets?status=resolved')}>
+              <div className="text-3xl font-bold text-blue-600 mb-1">{ticketStats.resolved}</div>
+              <div className="text-sm font-medium text-blue-700">Resolvidos</div>
             </div>
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">{ticketStats.closed}</div>
-              <div className="text-sm text-green-700">Fechados</div>
+            <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg hover:shadow-md transition-all duration-200 cursor-pointer" onClick={() => navigate('/tickets?status=closed')}>
+              <div className="text-3xl font-bold text-green-600 mb-1">{ticketStats.closed}</div>
+              <div className="text-sm font-medium text-green-700">Fechados</div>
             </div>
           </div>
         </div>

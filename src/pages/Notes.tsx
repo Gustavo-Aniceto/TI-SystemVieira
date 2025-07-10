@@ -185,7 +185,7 @@ const Notes = () => {
           filteredNotes.map(note => (
             <div
               key={note.id}
-              className="group relative bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden transition-shadow hover:shadow-md"
+              className="group relative bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-lg transform hover:scale-[1.02]"
               style={{ backgroundColor: note.color }}
             >
               <div className="p-4">
@@ -196,13 +196,13 @@ const Notes = () => {
                       <>
                         <button
                           onClick={() => openEditModal(note)}
-                          className="text-gray-600 hover:text-blue-600"
+                          className="text-gray-600 hover:text-blue-600 p-1 rounded-full hover:bg-white/50 transition-all"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(note.id)}
-                          className="text-gray-600 hover:text-red-600"
+                          className="text-gray-600 hover:text-red-600 p-1 rounded-full hover:bg-white/50 transition-all"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

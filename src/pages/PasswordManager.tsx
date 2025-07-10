@@ -331,7 +331,7 @@ const PasswordManager = () => {
             return (
               <div
                 key={password.id}
-                className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow"
+                className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02]"
               >
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center">
@@ -349,13 +349,13 @@ const PasswordManager = () => {
                   <div className="flex space-x-2">
                     <button
                       onClick={() => openEditModal(password)}
-                      className="text-gray-600 hover:text-blue-600 p-1"
+                      className="text-gray-600 hover:text-blue-600 p-1 rounded-full hover:bg-gray-100 transition-all"
                     >
                       <Edit className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(password.id)}
-                      className="text-gray-600 hover:text-red-600 p-1"
+                      className="text-gray-600 hover:text-red-600 p-1 rounded-full hover:bg-gray-100 transition-all"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

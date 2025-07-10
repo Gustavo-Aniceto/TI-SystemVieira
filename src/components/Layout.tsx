@@ -167,11 +167,13 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <aside className="w-64 bg-white border-r border-gray-200 p-4 flex flex-col">
+    <div className="flex h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+      <aside className="w-64 bg-white border-r border-gray-200 p-4 flex flex-col shadow-lg">
         <div className="py-4 border-b border-gray-200 mb-6">
-          <h1 className="text-xl font-bold text-blue-600">Aniceto&Vieira</h1>
-          <p className="text-sm text-gray-500">Sistema de Estoque TI</p>
+          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+            Aniceto&Vieira
+          </h1>
+          <p className="text-sm text-gray-500 font-medium">Sistema de Gestão TI</p>
         </div>
         
         <nav className="flex-1 space-y-2">
@@ -220,17 +222,15 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           </DropdownSection>
           
           {/* Tools */}
-          {!isSupervisor && (
-            <DropdownSection 
-              title="Tools" 
-              icon={<Wrench size={20} />} 
-              sectionKey="tools"
-            >
-              <SubNavItem to="/calendar" icon={<CalendarIcon size={16} />} label="Calendário" />
-              <SubNavItem to="/notes" icon={<StickyNote size={16} />} label="Anotações" />
-              <SubNavItem to="/password-manager" icon={<Key size={16} />} label="Gerenciador de Senhas" />
-            </DropdownSection>
-          )}
+          <DropdownSection 
+            title="Ferramentas" 
+            icon={<Wrench size={20} />} 
+            sectionKey="tools"
+          >
+            <SubNavItem to="/calendar" icon={<CalendarIcon size={16} />} label="Calendário" />
+            <SubNavItem to="/notes" icon={<StickyNote size={16} />} label="Anotações" />
+            <SubNavItem to="/password-manager" icon={<Key size={16} />} label="Gerenciador de Senhas" />
+          </DropdownSection>
           
           {/* Intern Activities */}
           {isIntern && (
@@ -240,7 +240,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         
         <div className="pt-4 mt-auto border-t border-gray-200">
           <div className="px-4 py-2">
-            <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+            <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
             <p className="text-xs text-gray-500">
               {user?.role === 'admin' ? 'Administrador' : 
                user?.role === 'intern' ? 'Estagiário' :
@@ -249,7 +249,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           </div>
           <button
             onClick={handleLogout}
-            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-100"
+            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 rounded-lg hover:bg-red-50 hover:text-red-700 transition-all duration-200"
           >
             <LogOut size={18} className="mr-2" />
             <span>Sair</span>
@@ -257,7 +257,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         </div>
       </aside>
       
-      <main className="flex-1 overflow-auto p-8">
+      <main className="flex-1 overflow-auto p-8 bg-gradient-to-br from-white to-gray-50">
         {children}
       </main>
     </div>

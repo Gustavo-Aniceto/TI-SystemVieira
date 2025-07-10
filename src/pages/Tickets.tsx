@@ -236,7 +236,7 @@ const Tickets = () => {
             const pendingTransfers = ticket.transfers.filter(t => t.status === 'pending' && t.toUserId === user?.id);
             
             return (
-              <div key={ticket.id} className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+              <div key={ticket.id} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02]">
                 <div className="p-6">
                   {/* Header */}
                   <div className="flex items-start justify-between mb-4">
@@ -277,35 +277,35 @@ const Tickets = () => {
                   {/* Details Grid */}
                   <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
                     <div>
-                      <div className="flex items-center text-gray-500 mb-1">
+                      <div className="flex items-center text-gray-500 mb-2">
                         <User className="w-3 h-3 mr-1" />
                         <span>Supervisor</span>
                       </div>
-                      <p className="text-gray-900 truncate">{ticket.supervisor}</p>
+                      <p className="text-gray-900 truncate font-medium">{ticket.supervisor}</p>
                     </div>
                     
                     <div>
-                      <div className="flex items-center text-gray-500 mb-1">
+                      <div className="flex items-center text-gray-500 mb-2">
                         <User className="w-3 h-3 mr-1" />
                         <span>Operador</span>
                       </div>
-                      <p className="text-gray-900 truncate">{ticket.operator}</p>
+                      <p className="text-gray-900 truncate font-medium">{ticket.operator}</p>
                     </div>
                     
                     <div>
-                      <div className="flex items-center text-gray-500 mb-1">
+                      <div className="flex items-center text-gray-500 mb-2">
                         <Building2 className="w-3 h-3 mr-1" />
                         <span>Empresa</span>
                       </div>
-                      <p className="text-gray-900 truncate">{ticket.company}</p>
+                      <p className="text-gray-900 truncate font-medium">{ticket.company}</p>
                     </div>
                     
                     <div>
-                      <div className="flex items-center text-gray-500 mb-1">
+                      <div className="flex items-center text-gray-500 mb-2">
                         <Monitor className="w-3 h-3 mr-1" />
                         <span>AnyDesk</span>
                       </div>
-                      <p className="text-gray-900 truncate">{ticket.anydeskAccess}</p>
+                      <p className="text-gray-900 truncate font-mono font-medium bg-gray-100 px-2 py-1 rounded">{ticket.anydeskAccess}</p>
                     </div>
                   </div>
 
