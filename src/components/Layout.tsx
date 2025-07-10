@@ -171,9 +171,9 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       <aside className="w-64 bg-white border-r border-gray-200 p-4 flex flex-col shadow-lg">
         <div className="py-4 border-b border-gray-200 mb-6">
           <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-            Aniceto&Vieira
+            VieiraStock
           </h1>
-          <p className="text-sm text-gray-500 font-medium">Sistema de Gestão TI</p>
+          <p className="text-sm text-gray-500 font-medium">Sistema de Estoque TI</p>
         </div>
         
         <nav className="flex-1 space-y-2">

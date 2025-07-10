@@ -122,7 +122,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const defaultCompanies = [
         { 
           id: '1', 
-          name: 'Aniceto&Vieira', 
+          name: 'VieiraStock', 
           description: 'Empresa principal',
           departments: ['TI', 'Administrativo', 'Operacional'],
           createdAt: new Date().toISOString() 
