@@ -30,17 +30,6 @@ const Dashboard = () => {
     closed: 0
   });
   
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-96">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-          <p className="text-gray-500">Carregando dados...</p>
-        </div>
-      </div>
-    );
-  }
-  
   useEffect(() => {
     // Get low stock products
     setLowStockProducts(getLowStockProducts());
@@ -65,6 +54,17 @@ const Dashboard = () => {
     
     setTicketStats(stats);
   }, [products, events, tickets, getLowStockProducts]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+          <p className="text-gray-500">Carregando dados...</p>
+        </div>
+      </div>
+    );
+  }
 
   const MetricCard = ({ 
     title, 
