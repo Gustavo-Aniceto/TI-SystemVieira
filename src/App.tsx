@@ -18,9 +18,14 @@ import Tickets from './pages/Tickets';
 import NotFound from './pages/NotFound';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DataProvider } from './contexts/DataContext';
+import LoadingSpinner from './components/LoadingSpinner';
 
 const ProtectedRoute = ({ children, roles }: { children: React.ReactNode, roles?: string[] }) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return <LoadingSpinner />;
+  }
   
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -34,7 +39,11 @@ const ProtectedRoute = ({ children, roles }: { children: React.ReactNode, roles?
 };
 
 const SupervisorRedirect = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return <LoadingSpinner />;
+  }
   
   if (user?.role === 'supervisor') {
     return <Navigate to="/tickets" replace />;
@@ -44,7 +53,11 @@ const SupervisorRedirect = () => {
 };
 
 const AuthenticatedApp = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return <LoadingSpinner />;
+  }
   
   if (!user) {
     return <Navigate to="/login" replace />;

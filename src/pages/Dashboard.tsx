@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 const Dashboard = () => {
-  const { products, categories, events, tickets, users, companies, getLowStockProducts } = useData();
+  const { products, categories, events, tickets, users, companies, getLowStockProducts, loading } = useData();
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [lowStockProducts, setLowStockProducts] = useState<typeof products>([]);
@@ -29,6 +29,17 @@ const Dashboard = () => {
     resolved: 0,
     closed: 0
   });
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+          <p className="text-gray-500">Carregando dados...</p>
+        </div>
+      </div>
+    );
+  }
   
   useEffect(() => {
     // Get low stock products

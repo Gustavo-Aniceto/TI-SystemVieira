@@ -1,72 +1,197 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Category, Product, CalendarEvent, User, InternActivity, MovementRecord, Note, ChecklistItem, Ticket, TicketComment, TicketTransfer, Company, PasswordEntry } from '../types';
+import { supabase } from '../lib/supabase';
 import { generateExcel } from '../utils/excelUtils';
 import toast from 'react-hot-toast';
 
+// Interfaces baseadas no schema do banco
+interface Category {
+  id: number;
+  nome: string;
+  descricao?: string;
+  criado_em: string;
+}
+
+interface Product {
+  id: number;
+  nome: string;
+  descricao?: string;
+  categoria_id: number;
+  status: 'ativo' | 'inativo' | 'em_manutencao';
+  quantidade: number;
+  quantidade_minima: number;
+  numero_serie?: string;
+  localizacao?: string;
+  data_compra?: string;
+  fim_garantia?: string;
+  notas?: string;
+  criado_em: string;
+}
+
+interface CalendarEvent {
+  id: number;
+  titulo: string;
+  descricao?: string;
+  tipo: 'assinatura' | 'tarefa' | 'lembrete';
+  data_inicio: string;
+  data_termino: string;
+  cor?: string;
+  criado_em: string;
+}
+
+interface User {
+  id: number;
+  nome: string;
+  nome_usuario: string;
+  email: string;
+  senha: string;
+  funcao: 'usuario' | 'administrador' | 'supervisor' | 'estagiario';
+  empresa_id: number;
+  setor_id?: number;
+  criado_em: string;
+}
+
+interface Company {
+  id: number;
+  nome: string;
+  descricao?: string;
+  criado_em: string;
+}
+
+interface Sector {
+  id: number;
+  nome: string;
+  empresa_id: number;
+  criado_em: string;
+}
+
+interface Ticket {
+  id: number;
+  problema: string;
+  supervisor_id: number;
+  posicao_operador?: string;
+  empresa_id: number;
+  setor_id: number;
+  id_acesso?: string;
+  anexo?: string;
+  status: 'aberto' | 'em_andamento' | 'resolvido';
+  criado_em: string;
+  tipo_id?: number;
+  subtipo_id?: number;
+}
+
+interface Note {
+  id: number;
+  titulo: string;
+  conteudo: string;
+  cor_fundo?: string;
+  tornar_publico: boolean;
+  criado_por?: number;
+  criado_em: string;
+}
+
+interface TaskList {
+  id: number;
+  titulo: string;
+  cor_fundo?: string;
+  tornar_publico: boolean;
+  criado_por?: number;
+  criado_em: string;
+}
+
+interface TaskListItem {
+  id: number;
+  id_lista: number;
+  nome_item: string;
+  concluido: boolean;
+}
+
+interface PasswordEntry {
+  id: number;
+  sistema: string;
+  usuario_acesso: string;
+  senha_criptografada: string;
+  categoria?: string;
+  observacoes?: string;
+  criado_por?: number;
+  criado_em: string;
+}
+
 interface DataContextType {
+  // Loading states
+  loading: boolean;
+  
   // Categories
   categories: Category[];
-  addCategory: (category: Omit<Category, 'id'>) => void;
-  updateCategory: (id: string, category: Partial<Category>) => void;
-  deleteCategory: (id: string) => void;
+  addCategory: (category: Omit<Category, 'id' | 'criado_em'>) => Promise<void>;
+  updateCategory: (id: number, category: Partial<Category>) => Promise<void>;
+  deleteCategory: (id: number) => Promise<void>;
   
   // Products
   products: Product[];
-  addProduct: (product: Omit<Product, 'id'>) => void;
-  updateProduct: (id: string, product: Partial<Product>) => void;
-  deleteProduct: (id: string) => void;
+  addProduct: (product: Omit<Product, 'id' | 'criado_em'>) => Promise<void>;
+  updateProduct: (id: number, product: Partial<Product>) => Promise<void>;
+  deleteProduct: (id: number) => Promise<void>;
   getLowStockProducts: () => Product[];
-  
-  // Product Movements
-  addMovement: (productId: string, movement: Omit<MovementRecord, 'id' | 'createdAt'>) => void;
   
   // Calendar
   events: CalendarEvent[];
-  addEvent: (event: Omit<CalendarEvent, 'id'>) => void;
-  updateEvent: (id: string, event: Partial<CalendarEvent>) => void;
-  deleteEvent: (id: string) => void;
+  addEvent: (event: Omit<CalendarEvent, 'id' | 'criado_em'>) => Promise<void>;
+  updateEvent: (id: number, event: Partial<CalendarEvent>) => Promise<void>;
+  deleteEvent: (id: number) => Promise<void>;
   
   // Users
   users: User[];
-  addUser: (user: Omit<User, 'id' | 'createdAt'>) => void;
-  updateUser: (id: string, user: Partial<User>) => void;
-  deleteUser: (id: string) => void;
+  addUser: (user: Omit<User, 'id' | 'criado_em'>) => Promise<void>;
+  updateUser: (id: number, user: Partial<User>) => Promise<void>;
+  deleteUser: (id: number) => Promise<void>;
   
   // Companies
   companies: Company[];
-  addCompany: (company: Omit<Company, 'id' | 'createdAt'>) => void;
-  updateCompany: (id: string, company: Partial<Company>) => void;
-  deleteCompany: (id: string) => void;
+  addCompany: (company: Omit<Company, 'id' | 'criado_em'>) => Promise<void>;
+  updateCompany: (id: number, company: Partial<Company>) => Promise<void>;
+  deleteCompany: (id: number) => Promise<void>;
   
-  // Intern Activities
-  activities: InternActivity[];
-  addActivity: (activity: Omit<InternActivity, 'id' | 'createdAt'>) => void;
-  updateActivity: (id: string, activity: Partial<InternActivity>) => void;
-  deleteActivity: (id: string) => void;
+  // Sectors
+  sectors: Sector[];
+  addSector: (sector: Omit<Sector, 'id' | 'criado_em'>) => Promise<void>;
+  updateSector: (id: number, sector: Partial<Sector>) => Promise<void>;
+  deleteSector: (id: number) => Promise<void>;
   
   // Notes
   notes: Note[];
-  addNote: (note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  updateNote: (id: string, note: Partial<Note>) => void;
-  deleteNote: (id: string) => void;
+  addNote: (note: Omit<Note, 'id' | 'criado_em'>) => Promise<void>;
+  updateNote: (id: number, note: Partial<Note>) => Promise<void>;
+  deleteNote: (id: number) => Promise<void>;
+  
+  // Task Lists
+  taskLists: TaskList[];
+  addTaskList: (taskList: Omit<TaskList, 'id' | 'criado_em'>) => Promise<void>;
+  updateTaskList: (id: number, taskList: Partial<TaskList>) => Promise<void>;
+  deleteTaskList: (id: number) => Promise<void>;
+  
+  // Task List Items
+  taskListItems: TaskListItem[];
+  addTaskListItem: (item: Omit<TaskListItem, 'id'>) => Promise<void>;
+  updateTaskListItem: (id: number, item: Partial<TaskListItem>) => Promise<void>;
+  deleteTaskListItem: (id: number) => Promise<void>;
   
   // Password Manager
   passwords: PasswordEntry[];
-  addPassword: (password: Omit<PasswordEntry, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  updatePassword: (id: string, password: Partial<PasswordEntry>) => void;
-  deletePassword: (id: string) => void;
-  
-  // Reports
-  generateReport: (type: string, filters: any) => void;
+  addPassword: (password: Omit<PasswordEntry, 'id' | 'criado_em'>) => Promise<void>;
+  updatePassword: (id: number, password: Partial<PasswordEntry>) => Promise<void>;
+  deletePassword: (id: number) => Promise<void>;
 
   // Tickets
   tickets: Ticket[];
-  addTicket: (ticket: Omit<Ticket, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'status' | 'attachments' | 'transfers'>) => void;
-  updateTicket: (id: string, ticket: Partial<Ticket>) => void;
-  deleteTicket: (id: string) => void;
-  addTicketComment: (ticketId: string, comment: Omit<TicketComment, 'id' | 'createdAt'>) => void;
-  transferTicket: (ticketId: string, transfer: Omit<TicketTransfer, 'id' | 'transferredAt'>) => void;
-  respondToTransfer: (ticketId: string, transferId: string, response: 'accepted' | 'rejected') => void;
+  addTicket: (ticket: Omit<Ticket, 'id' | 'criado_em'>) => Promise<void>;
+  updateTicket: (id: number, ticket: Partial<Ticket>) => Promise<void>;
+  deleteTicket: (id: number) => Promise<void>;
+  
+  // Reports
+  generateReport: (type: string, filters: any) => void;
+  
+  // Refresh data
+  refreshData: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType>({} as DataContextType);
@@ -74,641 +199,557 @@ const DataContext = createContext<DataContextType>({} as DataContextType);
 export const useData = () => useContext(DataContext);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [activities, setActivities] = useState<InternActivity[]>([]);
-  const [notes, setNotes] = useState<Note[]>([]);
+  const [sectors, setSectors] = useState<Sector[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [taskLists, setTaskLists] = useState<TaskList[]>([]);
+  const [taskListItems, setTaskListItems] = useState<TaskListItem[]>([]);
   const [passwords, setPasswords] = useState<PasswordEntry[]>([]);
 
-  // Load initial data
+  // Função para carregar todos os dados
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      const [
+        categoriesData,
+        productsData,
+        eventsData,
+        usersData,
+        companiesData,
+        sectorsData,
+        ticketsData,
+        notesData,
+        taskListsData,
+        taskListItemsData,
+        passwordsData
+      ] = await Promise.all([
+        supabase.getCategories(),
+        supabase.getProducts(),
+        supabase.getCalendarEvents(),
+        supabase.getUsers(),
+        supabase.getCompanies(),
+        supabase.getSectors(),
+        supabase.getTickets(),
+        supabase.getNotes(),
+        supabase.getTaskLists(),
+        supabase.getTaskListItems(),
+        supabase.getPasswords()
+      ]);
+
+      setCategories(categoriesData || []);
+      setProducts(productsData || []);
+      setEvents(eventsData || []);
+      setUsers(usersData || []);
+      setCompanies(companiesData || []);
+      setSectors(sectorsData || []);
+      setTickets(ticketsData || []);
+      setNotes(notesData || []);
+      setTaskLists(taskListsData || []);
+      setTaskListItems(taskListItemsData || []);
+      setPasswords(passwordsData || []);
+      
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      toast.error('Erro ao carregar dados do sistema');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Carregar dados na inicialização
   useEffect(() => {
-    // Load categories
-    const storedCategories = localStorage.getItem('categories');
-    if (storedCategories) {
-      setCategories(JSON.parse(storedCategories));
-    } else {
-      // Initialize with default categories
-      const defaultCategories = [
-        { id: '1', name: 'Hardware', description: 'Equipamentos físicos', createdAt: new Date().toISOString() },
-        { id: '2', name: 'Software', description: 'Programas e licenças', createdAt: new Date().toISOString() },
-        { id: '3', name: 'Rede', description: 'Equipamentos de rede', createdAt: new Date().toISOString() }
-      ];
-      setCategories(defaultCategories);
-      localStorage.setItem('categories', JSON.stringify(defaultCategories));
-    }
-
-    // Load products
-    const storedProducts = localStorage.getItem('products');
-    if (storedProducts) {
-      setProducts(JSON.parse(storedProducts));
-    }
-
-    // Load events
-    const storedEvents = localStorage.getItem('events');
-    if (storedEvents) {
-      setEvents(JSON.parse(storedEvents));
-    }
-
-    // Load companies
-    const storedCompanies = localStorage.getItem('companies');
-    if (storedCompanies) {
-      setCompanies(JSON.parse(storedCompanies));
-    } else {
-      // Initialize with default companies
-      const defaultCompanies = [
-        { 
-          id: '1', 
-          name: 'VieiraStock', 
-          description: 'Empresa principal',
-          departments: ['TI', 'Administrativo', 'Operacional'],
-          createdAt: new Date().toISOString() 
-        }
-      ];
-      setCompanies(defaultCompanies);
-      localStorage.setItem('companies', JSON.stringify(defaultCompanies));
-    }
-
-    // Load users
-    const storedUsers = localStorage.getItem('users');
-    if (storedUsers) {
-      setUsers(JSON.parse(storedUsers));
-    } else {
-      // Initialize with default admin user
-      const defaultUser = {
-        id: '1',
-        username: 'admin',
-        password: 'admin',
-        name: 'Administrador',
-        role: 'admin',
-        email: 'admin@example.com',
-        companyId: '1',
-        createdAt: new Date().toISOString()
-      };
-      setUsers([defaultUser]);
-      localStorage.setItem('users', JSON.stringify([defaultUser]));
-    }
-
-    // Load activities
-    const storedActivities = localStorage.getItem('activities');
-    if (storedActivities) {
-      setActivities(JSON.parse(storedActivities));
-    }
-
-    // Load notes
-    const storedNotes = localStorage.getItem('notes');
-    if (storedNotes) {
-      setNotes(JSON.parse(storedNotes));
-    }
-
-    // Load tickets
-    const storedTickets = localStorage.getItem('tickets');
-    if (storedTickets) {
-      setTickets(JSON.parse(storedTickets));
-    }
-
-    // Load passwords
-    const storedPasswords = localStorage.getItem('passwords');
-    if (storedPasswords) {
-      setPasswords(JSON.parse(storedPasswords));
-    }
+    loadData();
   }, []);
 
-  // Save data whenever it changes
-  useEffect(() => {
-    if (categories.length > 0) {
-      localStorage.setItem('categories', JSON.stringify(categories));
-    }
-  }, [categories]);
-
-  useEffect(() => {
-    if (products.length > 0) {
-      localStorage.setItem('products', JSON.stringify(products));
-    }
-  }, [products]);
-
-  useEffect(() => {
-    if (events.length > 0) {
-      localStorage.setItem('events', JSON.stringify(events));
-    }
-  }, [events]);
-
-  useEffect(() => {
-    if (users.length > 0) {
-      localStorage.setItem('users', JSON.stringify(users));
-    }
-  }, [users]);
-
-  useEffect(() => {
-    if (companies.length > 0) {
-      localStorage.setItem('companies', JSON.stringify(companies));
-    }
-  }, [companies]);
-
-  useEffect(() => {
-    if (activities.length > 0) {
-      localStorage.setItem('activities', JSON.stringify(activities));
-    }
-  }, [activities]);
-
-  useEffect(() => {
-    if (notes.length > 0) {
-      localStorage.setItem('notes', JSON.stringify(notes));
-    }
-  }, [notes]);
-
-  useEffect(() => {
-    if (tickets.length > 0) {
-      localStorage.setItem('tickets', JSON.stringify(tickets));
-    }
-  }, [tickets]);
-
-  useEffect(() => {
-    if (passwords.length > 0) {
-      localStorage.setItem('passwords', JSON.stringify(passwords));
-    }
-  }, [passwords]);
+  // Função para refresh manual dos dados
+  const refreshData = async () => {
+    await loadData();
+  };
 
   // Category operations
-  const addCategory = (category: Omit<Category, 'id'>) => {
-    const newCategory = {
-      ...category,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString()
-    };
-    setCategories([...categories, newCategory]);
-    toast.success('Categoria adicionada com sucesso!');
-  };
-
-  const updateCategory = (id: string, categoryUpdate: Partial<Category>) => {
-    setCategories(
-      categories.map(category => 
-        category.id === id ? { ...category, ...categoryUpdate } : category
-      )
-    );
-    toast.success('Categoria atualizada com sucesso!');
-  };
-
-  const deleteCategory = (id: string) => {
-    // Check if category is in use by any products
-    const isInUse = products.some(product => product.categoryId === id);
-    
-    if (isInUse) {
-      toast.error('Esta categoria não pode ser excluída porque está sendo usada por produtos.');
-      return;
+  const addCategory = async (categoryData: Omit<Category, 'id' | 'criado_em'>) => {
+    try {
+      const newCategory = await supabase.createCategory(categoryData);
+      if (newCategory && newCategory.length > 0) {
+        setCategories(prev => [...prev, newCategory[0]]);
+        toast.success('Categoria adicionada com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar categoria:', error);
+      toast.error('Erro ao adicionar categoria');
     }
-    
-    setCategories(categories.filter(category => category.id !== id));
-    toast.success('Categoria excluída com sucesso!');
   };
 
-  // Company operations
-  const addCompany = (company: Omit<Company, 'id' | 'createdAt'>) => {
-    const newCompany = {
-      ...company,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString()
-    };
-    setCompanies([...companies, newCompany]);
-    toast.success('Empresa adicionada com sucesso!');
-  };
-
-  const updateCompany = (id: string, companyUpdate: Partial<Company>) => {
-    setCompanies(
-      companies.map(company => 
-        company.id === id ? { ...company, ...companyUpdate } : company
-      )
-    );
-    toast.success('Empresa atualizada com sucesso!');
-  };
-
-  const deleteCompany = (id: string) => {
-    // Check if company is in use by any users
-    const isInUse = users.some(user => user.companyId === id);
-    
-    if (isInUse) {
-      toast.error('Esta empresa não pode ser excluída porque está sendo usada por usuários.');
-      return;
+  const updateCategory = async (id: number, categoryData: Partial<Category>) => {
+    try {
+      const updatedCategory = await supabase.updateCategory(id, categoryData);
+      if (updatedCategory && updatedCategory.length > 0) {
+        setCategories(prev => 
+          prev.map(cat => cat.id === id ? { ...cat, ...updatedCategory[0] } : cat)
+        );
+        toast.success('Categoria atualizada com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar categoria:', error);
+      toast.error('Erro ao atualizar categoria');
     }
-    
-    setCompanies(companies.filter(company => company.id !== id));
-    toast.success('Empresa excluída com sucesso!');
+  };
+
+  const deleteCategory = async (id: number) => {
+    try {
+      // Verificar se categoria está em uso
+      const isInUse = products.some(product => product.categoria_id === id);
+      if (isInUse) {
+        toast.error('Esta categoria não pode ser excluída porque está sendo usada por produtos.');
+        return;
+      }
+
+      await supabase.deleteCategory(id);
+      setCategories(prev => prev.filter(cat => cat.id !== id));
+      toast.success('Categoria excluída com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir categoria:', error);
+      toast.error('Erro ao excluir categoria');
+    }
   };
 
   // Product operations
-  const addProduct = (product: Omit<Product, 'id'>) => {
-    const newProduct = {
-      ...product,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-      maintenanceHistory: [],
-      movementHistory: []
-    };
-    setProducts([...products, newProduct]);
-    toast.success('Produto adicionado com sucesso!');
-    
-    // Check for low stock
-    if (newProduct.quantity <= newProduct.minQuantity) {
-      toast.error(`ALERTA: ${newProduct.name} está com estoque baixo!`);
+  const addProduct = async (productData: Omit<Product, 'id' | 'criado_em'>) => {
+    try {
+      const newProduct = await supabase.createProduct(productData);
+      if (newProduct && newProduct.length > 0) {
+        setProducts(prev => [...prev, newProduct[0]]);
+        toast.success('Produto adicionado com sucesso!');
+        
+        // Verificar estoque baixo
+        if (newProduct[0].quantidade <= newProduct[0].quantidade_minima) {
+          toast.error(`ALERTA: ${newProduct[0].nome} está com estoque baixo!`);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar produto:', error);
+      toast.error('Erro ao adicionar produto');
     }
   };
 
-  const updateProduct = (id: string, productUpdate: Partial<Product>) => {
-    const updatedProducts = products.map(product => {
-      if (product.id === id) {
-        const updatedProduct = { ...product, ...productUpdate };
+  const updateProduct = async (id: number, productData: Partial<Product>) => {
+    try {
+      const updatedProduct = await supabase.updateProduct(id, productData);
+      if (updatedProduct && updatedProduct.length > 0) {
+        setProducts(prev => 
+          prev.map(prod => prod.id === id ? { ...prod, ...updatedProduct[0] } : prod)
+        );
+        toast.success('Produto atualizado com sucesso!');
         
-        // Check for low stock after update
-        if (updatedProduct.quantity <= updatedProduct.minQuantity) {
-          toast.error(`ALERTA: ${updatedProduct.name} está com estoque baixo!`);
+        // Verificar estoque baixo
+        const product = updatedProduct[0];
+        if (product.quantidade <= product.quantidade_minima) {
+          toast.error(`ALERTA: ${product.nome} está com estoque baixo!`);
         }
-        
-        return updatedProduct;
       }
-      return product;
-    });
-    
-    setProducts(updatedProducts);
-    toast.success('Produto atualizado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao atualizar produto:', error);
+      toast.error('Erro ao atualizar produto');
+    }
   };
 
-  const deleteProduct = (id: string) => {
-    setProducts(products.filter(product => product.id !== id));
-    toast.success('Produto excluído com sucesso!');
+  const deleteProduct = async (id: number) => {
+    try {
+      await supabase.deleteProduct(id);
+      setProducts(prev => prev.filter(prod => prod.id !== id));
+      toast.success('Produto excluído com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir produto:', error);
+      toast.error('Erro ao excluir produto');
+    }
   };
 
   const getLowStockProducts = () => {
-    return products.filter(product => product.quantity <= product.minQuantity);
+    return products.filter(product => product.quantidade <= product.quantidade_minima);
   };
 
-  // Product Movement operations
-  const addMovement = (productId: string, movement: Omit<MovementRecord, 'id' | 'createdAt'>) => {
-    const newMovement = {
-      ...movement,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString()
-    };
-
-    setProducts(products.map(product => {
-      if (product.id === productId) {
-        const updatedProduct = {
-          ...product,
-          movementHistory: [...product.movementHistory, newMovement]
-        };
-
-        // Update quantity based on movement type
-        if (movement.type === 'check-out') {
-          updatedProduct.quantity -= 1;
-        } else if (movement.type === 'check-in') {
-          updatedProduct.quantity += 1;
-        }
-
-        return updatedProduct;
+  // Company operations
+  const addCompany = async (companyData: Omit<Company, 'id' | 'criado_em'>) => {
+    try {
+      const newCompany = await supabase.createCompany(companyData);
+      if (newCompany && newCompany.length > 0) {
+        setCompanies(prev => [...prev, newCompany[0]]);
+        toast.success('Empresa adicionada com sucesso!');
       }
-      return product;
-    }));
-
-    toast.success('Movimentação registrada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao adicionar empresa:', error);
+      toast.error('Erro ao adicionar empresa');
+    }
   };
 
-  // Calendar operations
-  const addEvent = (event: Omit<CalendarEvent, 'id'>) => {
-    const newEvent = {
-      ...event,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString()
-    };
-    setEvents([...events, newEvent]);
-    toast.success('Evento adicionado com sucesso!');
+  const updateCompany = async (id: number, companyData: Partial<Company>) => {
+    try {
+      const updatedCompany = await supabase.updateCompany(id, companyData);
+      if (updatedCompany && updatedCompany.length > 0) {
+        setCompanies(prev => 
+          prev.map(comp => comp.id === id ? { ...comp, ...updatedCompany[0] } : comp)
+        );
+        toast.success('Empresa atualizada com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar empresa:', error);
+      toast.error('Erro ao atualizar empresa');
+    }
   };
 
-  const updateEvent = (id: string, eventUpdate: Partial<CalendarEvent>) => {
-    setEvents(
-      events.map(event => 
-        event.id === id ? { ...event, ...eventUpdate } : event
-      )
-    );
-    toast.success('Evento atualizado com sucesso!');
+  const deleteCompany = async (id: number) => {
+    try {
+      // Verificar se empresa está em uso
+      const isInUse = users.some(user => user.empresa_id === id);
+      if (isInUse) {
+        toast.error('Esta empresa não pode ser excluída porque está sendo usada por usuários.');
+        return;
+      }
+
+      await supabase.deleteCompany(id);
+      setCompanies(prev => prev.filter(comp => comp.id !== id));
+      toast.success('Empresa excluída com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir empresa:', error);
+      toast.error('Erro ao excluir empresa');
+    }
   };
 
-  const deleteEvent = (id: string) => {
-    setEvents(events.filter(event => event.id !== id));
-    toast.success('Evento excluído com sucesso!');
+  // Sector operations
+  const addSector = async (sectorData: Omit<Sector, 'id' | 'criado_em'>) => {
+    try {
+      const newSector = await supabase.createSector(sectorData);
+      if (newSector && newSector.length > 0) {
+        setSectors(prev => [...prev, newSector[0]]);
+        toast.success('Setor adicionado com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar setor:', error);
+      toast.error('Erro ao adicionar setor');
+    }
+  };
+
+  const updateSector = async (id: number, sectorData: Partial<Sector>) => {
+    try {
+      const updatedSector = await supabase.updateSector(id, sectorData);
+      if (updatedSector && updatedSector.length > 0) {
+        setSectors(prev => 
+          prev.map(sect => sect.id === id ? { ...sect, ...updatedSector[0] } : sect)
+        );
+        toast.success('Setor atualizado com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar setor:', error);
+      toast.error('Erro ao atualizar setor');
+    }
+  };
+
+  const deleteSector = async (id: number) => {
+    try {
+      await supabase.deleteSector(id);
+      setSectors(prev => prev.filter(sect => sect.id !== id));
+      toast.success('Setor excluído com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir setor:', error);
+      toast.error('Erro ao excluir setor');
+    }
   };
 
   // User operations
-  const addUser = (user: Omit<User, 'id' | 'createdAt'>) => {
-    const newUser = {
-      ...user,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString()
-    };
-    setUsers([...users, newUser]);
-    toast.success('Usuário adicionado com sucesso!');
-  };
-
-  const updateUser = (id: string, userUpdate: Partial<User>) => {
-    setUsers(
-      users.map(user => 
-        user.id === id ? { ...user, ...userUpdate } : user
-      )
-    );
-    toast.success('Usuário atualizado com sucesso!');
-  };
-
-  const deleteUser = (id: string) => {
-    // Prevent deleting the last admin user
-    const adminUsers = users.filter(user => user.role === 'admin');
-    const targetUser = users.find(user => user.id === id);
-    
-    if (adminUsers.length === 1 && targetUser?.role === 'admin') {
-      toast.error('Não é possível excluir o último usuário administrador.');
-      return;
-    }
-    
-    setUsers(users.filter(user => user.id !== id));
-    toast.success('Usuário excluído com sucesso!');
-  };
-
-  // Intern Activity operations
-  const addActivity = (activity: Omit<InternActivity, 'id' | 'createdAt' | 'startDate'>) => {
-    const newActivity = {
-      ...activity,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-      startDate: new Date().toISOString(),
-      status: 'in-progress' as const
-    };
-    setActivities([...activities, newActivity]);
-    toast.success('Atividade iniciada com sucesso!');
-  };
-
-  const updateActivity = (id: string, activityUpdate: Partial<InternActivity>) => {
-    const now = new Date().toISOString();
-    let updatedActivity = { ...activityUpdate };
-    
-    // Calculate duration when completing activity
-    if (activityUpdate.status === 'completed') {
-      const activity = activities.find(a => a.id === id);
-      if (activity && activity.startDate) {
-        const startTime = new Date(activity.startDate).getTime();
-        const endTime = new Date(now).getTime();
-        const durationMinutes = Math.round((endTime - startTime) / (1000 * 60));
-        updatedActivity = {
-          ...updatedActivity,
-          endDate: now,
-          completedAt: now,
-          duration: durationMinutes
-        };
+  const addUser = async (userData: Omit<User, 'id' | 'criado_em'>) => {
+    try {
+      const newUser = await supabase.createUser(userData);
+      if (newUser && newUser.length > 0) {
+        setUsers(prev => [...prev, newUser[0]]);
+        toast.success('Usuário adicionado com sucesso!');
       }
-    }
-    
-    // Set submission time when submitting for review
-    if (activityUpdate.status === 'pending-review') {
-      updatedActivity = {
-        ...updatedActivity,
-        submittedAt: now
-      };
-    }
-    
-    // Set review time when approving/rejecting
-    if (activityUpdate.status === 'approved' || activityUpdate.status === 'rejected') {
-      updatedActivity = {
-        ...updatedActivity,
-        reviewedAt: now
-      };
-    }
-    
-    setActivities(
-      activities.map(activity => 
-        activity.id === id ? { ...activity, ...updatedActivity } : activity
-      )
-    );
-    
-    if (activityUpdate.status === 'completed') {
-      toast.success('Atividade finalizada com sucesso!');
-    } else if (activityUpdate.status === 'pending-review') {
-      toast.success('Atividade enviada para revisão!');
-    } else if (activityUpdate.status === 'approved') {
-      toast.success('Atividade aprovada!');
-    } else if (activityUpdate.status === 'rejected') {
-      toast.success('Atividade rejeitada!');
-    } else {
-      toast.success('Atividade atualizada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao adicionar usuário:', error);
+      toast.error('Erro ao adicionar usuário');
     }
   };
 
-  const deleteActivity = (id: string) => {
-    setActivities(activities.filter(activity => activity.id !== id));
-    toast.success('Atividade excluída com sucesso!');
+  const updateUser = async (id: number, userData: Partial<User>) => {
+    try {
+      const updatedUser = await supabase.updateUser(id, userData);
+      if (updatedUser && updatedUser.length > 0) {
+        setUsers(prev => 
+          prev.map(user => user.id === id ? { ...user, ...updatedUser[0] } : user)
+        );
+        toast.success('Usuário atualizado com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar usuário:', error);
+      toast.error('Erro ao atualizar usuário');
+    }
   };
 
-  // Notes operations
-  const addNote = (note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const now = new Date().toISOString();
-    const newNote = {
-      ...note,
-      id: Date.now().toString(),
-      createdAt: now,
-      updatedAt: now
-    };
-    setNotes([...notes, newNote]);
-    toast.success('Anotação criada com sucesso!');
+  const deleteUser = async (id: number) => {
+    try {
+      // Verificar se é o último admin
+      const adminUsers = users.filter(user => user.funcao === 'administrador');
+      const targetUser = users.find(user => user.id === id);
+      
+      if (adminUsers.length === 1 && targetUser?.funcao === 'administrador') {
+        toast.error('Não é possível excluir o último usuário administrador.');
+        return;
+      }
+
+      await supabase.deleteUser(id);
+      setUsers(prev => prev.filter(user => user.id !== id));
+      toast.success('Usuário excluído com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir usuário:', error);
+      toast.error('Erro ao excluir usuário');
+    }
   };
 
-  const updateNote = (id: string, noteUpdate: Partial<Note>) => {
-    setNotes(
-      notes.map(note => 
-        note.id === id 
-          ? { 
-              ...note, 
-              ...noteUpdate, 
-              updatedAt: new Date().toISOString() 
-            } 
-          : note
-      )
-    );
-    toast.success('Anotação atualizada com sucesso!');
+  // Calendar operations
+  const addEvent = async (eventData: Omit<CalendarEvent, 'id' | 'criado_em'>) => {
+    try {
+      const newEvent = await supabase.createCalendarEvent(eventData);
+      if (newEvent && newEvent.length > 0) {
+        setEvents(prev => [...prev, newEvent[0]]);
+        toast.success('Evento adicionado com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar evento:', error);
+      toast.error('Erro ao adicionar evento');
+    }
   };
 
-  const deleteNote = (id: string) => {
-    setNotes(notes.filter(note => note.id !== id));
-    toast.success('Anotação excluída com sucesso!');
+  const updateEvent = async (id: number, eventData: Partial<CalendarEvent>) => {
+    try {
+      const updatedEvent = await supabase.updateCalendarEvent(id, eventData);
+      if (updatedEvent && updatedEvent.length > 0) {
+        setEvents(prev => 
+          prev.map(event => event.id === id ? { ...event, ...updatedEvent[0] } : event)
+        );
+        toast.success('Evento atualizado com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar evento:', error);
+      toast.error('Erro ao atualizar evento');
+    }
+  };
+
+  const deleteEvent = async (id: number) => {
+    try {
+      await supabase.deleteCalendarEvent(id);
+      setEvents(prev => prev.filter(event => event.id !== id));
+      toast.success('Evento excluído com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir evento:', error);
+      toast.error('Erro ao excluir evento');
+    }
+  };
+
+  // Note operations
+  const addNote = async (noteData: Omit<Note, 'id' | 'criado_em'>) => {
+    try {
+      const newNote = await supabase.createNote(noteData);
+      if (newNote && newNote.length > 0) {
+        setNotes(prev => [...prev, newNote[0]]);
+        toast.success('Anotação criada com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao criar anotação:', error);
+      toast.error('Erro ao criar anotação');
+    }
+  };
+
+  const updateNote = async (id: number, noteData: Partial<Note>) => {
+    try {
+      const updatedNote = await supabase.updateNote(id, noteData);
+      if (updatedNote && updatedNote.length > 0) {
+        setNotes(prev => 
+          prev.map(note => note.id === id ? { ...note, ...updatedNote[0] } : note)
+        );
+        toast.success('Anotação atualizada com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar anotação:', error);
+      toast.error('Erro ao atualizar anotação');
+    }
+  };
+
+  const deleteNote = async (id: number) => {
+    try {
+      await supabase.deleteNote(id);
+      setNotes(prev => prev.filter(note => note.id !== id));
+      toast.success('Anotação excluída com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir anotação:', error);
+      toast.error('Erro ao excluir anotação');
+    }
+  };
+
+  // Task List operations
+  const addTaskList = async (taskListData: Omit<TaskList, 'id' | 'criado_em'>) => {
+    try {
+      const newTaskList = await supabase.createTaskList(taskListData);
+      if (newTaskList && newTaskList.length > 0) {
+        setTaskLists(prev => [...prev, newTaskList[0]]);
+        toast.success('Lista de tarefas criada com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao criar lista de tarefas:', error);
+      toast.error('Erro ao criar lista de tarefas');
+    }
+  };
+
+  const updateTaskList = async (id: number, taskListData: Partial<TaskList>) => {
+    try {
+      const updatedTaskList = await supabase.updateTaskList(id, taskListData);
+      if (updatedTaskList && updatedTaskList.length > 0) {
+        setTaskLists(prev => 
+          prev.map(list => list.id === id ? { ...list, ...updatedTaskList[0] } : list)
+        );
+        toast.success('Lista de tarefas atualizada com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar lista de tarefas:', error);
+      toast.error('Erro ao atualizar lista de tarefas');
+    }
+  };
+
+  const deleteTaskList = async (id: number) => {
+    try {
+      await supabase.deleteTaskList(id);
+      setTaskLists(prev => prev.filter(list => list.id !== id));
+      // Remover itens da lista também
+      setTaskListItems(prev => prev.filter(item => item.id_lista !== id));
+      toast.success('Lista de tarefas excluída com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir lista de tarefas:', error);
+      toast.error('Erro ao excluir lista de tarefas');
+    }
+  };
+
+  // Task List Item operations
+  const addTaskListItem = async (itemData: Omit<TaskListItem, 'id'>) => {
+    try {
+      const newItem = await supabase.createTaskListItem(itemData);
+      if (newItem && newItem.length > 0) {
+        setTaskListItems(prev => [...prev, newItem[0]]);
+        toast.success('Item adicionado com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar item:', error);
+      toast.error('Erro ao adicionar item');
+    }
+  };
+
+  const updateTaskListItem = async (id: number, itemData: Partial<TaskListItem>) => {
+    try {
+      const updatedItem = await supabase.updateTaskListItem(id, itemData);
+      if (updatedItem && updatedItem.length > 0) {
+        setTaskListItems(prev => 
+          prev.map(item => item.id === id ? { ...item, ...updatedItem[0] } : item)
+        );
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar item:', error);
+      toast.error('Erro ao atualizar item');
+    }
+  };
+
+  const deleteTaskListItem = async (id: number) => {
+    try {
+      await supabase.deleteTaskListItem(id);
+      setTaskListItems(prev => prev.filter(item => item.id !== id));
+      toast.success('Item excluído com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir item:', error);
+      toast.error('Erro ao excluir item');
+    }
   };
 
   // Password operations
-  const addPassword = (password: Omit<PasswordEntry, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const now = new Date().toISOString();
-    const newPassword = {
-      ...password,
-      id: Date.now().toString(),
-      createdAt: now,
-      updatedAt: now
-    };
-    setPasswords([...passwords, newPassword]);
-    toast.success('Senha adicionada com sucesso!');
+  const addPassword = async (passwordData: Omit<PasswordEntry, 'id' | 'criado_em'>) => {
+    try {
+      const newPassword = await supabase.createPassword(passwordData);
+      if (newPassword && newPassword.length > 0) {
+        setPasswords(prev => [...prev, newPassword[0]]);
+        toast.success('Senha adicionada com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar senha:', error);
+      toast.error('Erro ao adicionar senha');
+    }
   };
 
-  const updatePassword = (id: string, passwordUpdate: Partial<PasswordEntry>) => {
-    setPasswords(
-      passwords.map(password => 
-        password.id === id 
-          ? { 
-              ...password, 
-              ...passwordUpdate, 
-              updatedAt: new Date().toISOString() 
-            } 
-          : password
-      )
-    );
-    toast.success('Senha atualizada com sucesso!');
+  const updatePassword = async (id: number, passwordData: Partial<PasswordEntry>) => {
+    try {
+      const updatedPassword = await supabase.updatePassword(id, passwordData);
+      if (updatedPassword && updatedPassword.length > 0) {
+        setPasswords(prev => 
+          prev.map(pass => pass.id === id ? { ...pass, ...updatedPassword[0] } : pass)
+        );
+        toast.success('Senha atualizada com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar senha:', error);
+      toast.error('Erro ao atualizar senha');
+    }
   };
 
-  const deletePassword = (id: string) => {
-    setPasswords(passwords.filter(password => password.id !== id));
-    toast.success('Senha excluída com sucesso!');
+  const deletePassword = async (id: number) => {
+    try {
+      await supabase.deletePassword(id);
+      setPasswords(prev => prev.filter(pass => pass.id !== id));
+      toast.success('Senha excluída com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir senha:', error);
+      toast.error('Erro ao excluir senha');
+    }
   };
 
   // Ticket operations
-  const addTicket = (ticket: Omit<Ticket, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'status' | 'attachments' | 'transfers'>) => {
-    const now = new Date().toISOString();
-    const newTicket = {
-      ...ticket,
-      id: Date.now().toString(),
-      status: 'open' as const,
-      comments: [],
-      attachments: [],
-      transfers: [],
-      createdAt: now,
-      updatedAt: now
-    };
-    setTickets([...tickets, newTicket]);
-    toast.success('Chamado criado com sucesso!');
-  };
-
-  const updateTicket = (id: string, ticketUpdate: Partial<Ticket>) => {
-    const now = new Date().toISOString();
-    let updatedTicket = { ...ticketUpdate };
-    
-    // Calculate response time when ticket is first attended
-    if (ticketUpdate.attendedBy && !tickets.find(t => t.id === id)?.attendedBy) {
-      const ticket = tickets.find(t => t.id === id);
-      if (ticket) {
-        const createdTime = new Date(ticket.createdAt).getTime();
-        const attendedTime = new Date(now).getTime();
-        const responseTimeMinutes = Math.round((attendedTime - createdTime) / (1000 * 60));
-        updatedTicket = {
-          ...updatedTicket,
-          responseTime: responseTimeMinutes,
-          attendedAt: now
-        };
+  const addTicket = async (ticketData: Omit<Ticket, 'id' | 'criado_em'>) => {
+    try {
+      const newTicket = await supabase.createTicket(ticketData);
+      if (newTicket && newTicket.length > 0) {
+        setTickets(prev => [...prev, newTicket[0]]);
+        toast.success('Chamado criado com sucesso!');
       }
+    } catch (error) {
+      console.error('Erro ao criar chamado:', error);
+      toast.error('Erro ao criar chamado');
     }
-    
-    setTickets(
-      tickets.map(ticket =>
-        ticket.id === id
-          ? {
-              ...ticket,
-              ...updatedTicket,
-              updatedAt: new Date().toISOString()
-            }
-          : ticket
-      )
-    );
-    toast.success('Chamado atualizado com sucesso!');
   };
 
-  const deleteTicket = (id: string) => {
-    setTickets(tickets.filter(ticket => ticket.id !== id));
-    toast.success('Chamado excluído com sucesso!');
+  const updateTicket = async (id: number, ticketData: Partial<Ticket>) => {
+    try {
+      const updatedTicket = await supabase.updateTicket(id, ticketData);
+      if (updatedTicket && updatedTicket.length > 0) {
+        setTickets(prev => 
+          prev.map(ticket => ticket.id === id ? { ...ticket, ...updatedTicket[0] } : ticket)
+        );
+        toast.success('Chamado atualizado com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar chamado:', error);
+      toast.error('Erro ao atualizar chamado');
+    }
   };
 
-  const addTicketComment = (ticketId: string, comment: Omit<TicketComment, 'id' | 'createdAt'>) => {
-    const newComment = {
-      ...comment,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString()
-    };
-
-    setTickets(
-      tickets.map(ticket =>
-        ticket.id === ticketId
-          ? {
-              ...ticket,
-              comments: [...ticket.comments, newComment],
-              updatedAt: new Date().toISOString()
-            }
-          : ticket
-      )
-    );
-    toast.success('Comentário adicionado com sucesso!');
-  };
-
-  const transferTicket = (ticketId: string, transfer: Omit<TicketTransfer, 'id' | 'transferredAt'>) => {
-    const newTransfer = {
-      ...transfer,
-      id: Date.now().toString(),
-      transferredAt: new Date().toISOString()
-    };
-
-    setTickets(
-      tickets.map(ticket =>
-        ticket.id === ticketId
-          ? {
-              ...ticket,
-              transfers: [...ticket.transfers, newTransfer],
-              updatedAt: new Date().toISOString()
-            }
-          : ticket
-      )
-    );
-    toast.success('Solicitação de transferência enviada!');
-  };
-
-  const respondToTransfer = (ticketId: string, transferId: string, response: 'accepted' | 'rejected') => {
-    setTickets(
-      tickets.map(ticket => {
-        if (ticket.id === ticketId) {
-          const updatedTransfers = ticket.transfers.map(transfer =>
-            transfer.id === transferId
-              ? {
-                  ...transfer,
-                  status: response,
-                  respondedAt: new Date().toISOString()
-                }
-              : transfer
-          );
-
-          // If accepted, update the ticket's attendedBy
-          let updatedTicket = {
-            ...ticket,
-            transfers: updatedTransfers,
-            updatedAt: new Date().toISOString()
-          };
-
-          if (response === 'accepted') {
-            const acceptedTransfer = updatedTransfers.find(t => t.id === transferId);
-            if (acceptedTransfer) {
-              updatedTicket = {
-                ...updatedTicket,
-                attendedBy: acceptedTransfer.toUserId,
-                attendedAt: new Date().toISOString(),
-                status: 'in-progress'
-              };
-            }
-          }
-
-          return updatedTicket;
-        }
-        return ticket;
-      })
-    );
-
-    toast.success(response === 'accepted' ? 'Transferência aceita!' : 'Transferência rejeitada!');
+  const deleteTicket = async (id: number) => {
+    try {
+      await supabase.deleteTicket(id);
+      setTickets(prev => prev.filter(ticket => ticket.id !== id));
+      toast.success('Chamado excluído com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir chamado:', error);
+      toast.error('Erro ao excluir chamado');
+    }
   };
 
   // Reports
@@ -720,105 +761,44 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       case 'products':
         data = products;
         if (filters.categoryId) {
-          data = data.filter(product => product.categoryId === filters.categoryId);
+          data = data.filter(product => product.categoria_id === filters.categoryId);
         }
         if (filters.status) {
           data = data.filter(product => product.status === filters.status);
         }
         if (filters.lowStock) {
-          data = data.filter(product => product.quantity <= product.minQuantity);
+          data = data.filter(product => product.quantidade <= product.quantidade_minima);
         }
         
-        // Enrich data with category names
+        // Enriquecer dados com nomes das categorias
         data = data.map(product => {
-          const category = categories.find(c => c.id === product.categoryId);
+          const category = categories.find(c => c.id === product.categoria_id);
           return {
             ...product,
-            categoryName: category ? category.name : 'Sem categoria'
+            categoryName: category ? category.nome : 'Sem categoria'
           };
         });
         
         columns = ['ID', 'Nome', 'Categoria', 'Quantidade', 'Quantidade Mínima', 'Status', 'Data de Criação'];
         break;
         
-      case 'movements':
-        data = products.flatMap(product => 
-          product.movementHistory.map(movement => ({
-            ...movement,
-            productName: product.name,
-            userName: users.find(u => u.id === movement.userId)?.name || 'Usuário Removido'
-          }))
-        );
-        
-        if (filters.startDate) {
-          data = data.filter(movement => new Date(movement.date) >= new Date(filters.startDate));
-        }
-        if (filters.endDate) {
-          data = data.filter(movement => new Date(movement.date) <= new Date(filters.endDate));
-        }
-        if (filters.type) {
-          data = data.filter(movement => movement.type === filters.type);
-        }
-        
-        columns = ['ID', 'Produto', 'Tipo', 'Usuário', 'De', 'Para', 'Data', 'Motivo', 'Retorno Previsto'];
+      case 'categories':
+        data = categories;
+        columns = ['ID', 'Nome', 'Descrição', 'Data de Criação'];
         break;
         
-      case 'internActivities':
-        data = activities;
-        if (filters.internId) {
-          data = data.filter(activity => activity.internId === filters.internId);
-        }
-        if (filters.category) {
-          data = data.filter(activity => activity.category === filters.category);
-        }
-        if (filters.status) {
-          data = data.filter(activity => activity.status === filters.status);
-        }
+      case 'events':
+        data = events;
         if (filters.startDate) {
-          data = data.filter(activity => new Date(activity.date) >= new Date(filters.startDate));
+          data = data.filter(event => new Date(event.data_inicio) >= new Date(filters.startDate));
         }
         if (filters.endDate) {
-          data = data.filter(activity => new Date(activity.date) <= new Date(filters.endDate));
-        }
-        
-        // Enrich data with intern names
-        data = data.map(activity => {
-          const intern = users.find(u => u.id === activity.internId);
-          return {
-            ...activity,
-            internName: intern ? intern.name : 'Usuário Removido'
-          };
-        });
-        
-        columns = ['ID', 'Estagiário', 'Data', 'Categoria', 'Descrição', 'Horas', 'Status', 'Feedback'];
-        break;
-
-      case 'notes':
-        data = notes;
-        if (filters.userId) {
-          data = data.filter(note => note.userId === filters.userId || note.isPublic);
+          data = data.filter(event => new Date(event.data_inicio) <= new Date(filters.endDate));
         }
         if (filters.type) {
-          data = data.filter(note => note.type === filters.type);
+          data = data.filter(event => event.tipo === filters.type);
         }
-        if (filters.startDate) {
-          data = data.filter(note => new Date(note.createdAt) >= new Date(filters.startDate));
-        }
-        if (filters.endDate) {
-          data = data.filter(note => new Date(note.createdAt) <= new Date(filters.endDate));
-        }
-
-        // Enrich data with user names
-        data = data.map(note => {
-          const noteUser = users.find(u => u.id === note.userId);
-          return {
-            ...note,
-            userName: noteUser ? noteUser.name : 'Usuário Removido',
-            visibility: note.isPublic ? 'Pública' : 'Privada'
-          };
-        });
-
-        columns = ['ID', 'Título', 'Conteúdo', 'Tipo', 'Usuário', 'Visibilidade', 'Criado em', 'Atualizado em'];
+        columns = ['ID', 'Título', 'Tipo', 'Data de Início', 'Data de Término', 'Descrição'];
         break;
 
       case 'tickets':
@@ -826,31 +806,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (filters.status) {
           data = data.filter(ticket => ticket.status === filters.status);
         }
-        if (filters.createdBy) {
-          data = data.filter(ticket => ticket.createdBy === filters.createdBy);
-        }
-        if (filters.attendedBy) {
-          data = data.filter(ticket => ticket.attendedBy === filters.attendedBy);
-        }
         if (filters.startDate) {
-          data = data.filter(ticket => new Date(ticket.createdAt) >= new Date(filters.startDate));
+          data = data.filter(ticket => new Date(ticket.criado_em) >= new Date(filters.startDate));
         }
         if (filters.endDate) {
-          data = data.filter(ticket => new Date(ticket.createdAt) <= new Date(filters.endDate));
+          data = data.filter(ticket => new Date(ticket.criado_em) <= new Date(filters.endDate));
         }
-
-        // Enrich data with user names
-        data = data.map(ticket => {
-          const creator = users.find(u => u.id === ticket.createdBy);
-          const attendant = ticket.attendedBy ? users.find(u => u.id === ticket.attendedBy) : null;
-          return {
-            ...ticket,
-            creatorName: creator ? creator.name : 'Usuário Removido',
-            attendantName: attendant ? attendant.name : 'Não atendido'
-          };
-        });
-
-        columns = ['ID', 'Problema', 'Supervisor', 'Operador', 'Empresa', 'Acesso AnyDesk', 'Status', 'Criado por', 'Atendido por', 'Data de Criação', 'Data de Atendimento', 'Data de Fechamento', 'Feedback'];
+        columns = ['ID', 'Problema', 'Status', 'Data de Criação'];
         break;
         
       default:
@@ -865,6 +827,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <DataContext.Provider
       value={{
+        loading,
+        
         categories,
         addCategory,
         updateCategory,
@@ -875,8 +839,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateProduct,
         deleteProduct,
         getLowStockProducts,
-        
-        addMovement,
         
         events,
         addEvent,
@@ -893,30 +855,38 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateCompany,
         deleteCompany,
         
-        activities,
-        addActivity,
-        updateActivity,
-        deleteActivity,
+        sectors,
+        addSector,
+        updateSector,
+        deleteSector,
         
         notes,
         addNote,
         updateNote,
         deleteNote,
         
+        taskLists,
+        addTaskList,
+        updateTaskList,
+        deleteTaskList,
+        
+        taskListItems,
+        addTaskListItem,
+        updateTaskListItem,
+        deleteTaskListItem,
+        
         passwords,
         addPassword,
         updatePassword,
         deletePassword,
-        
-        generateReport,
 
         tickets,
         addTicket,
         updateTicket,
         deleteTicket,
-        addTicketComment,
-        transferTicket,
-        respondToTransfer
+        
+        generateReport,
+        refreshData
       }}
     >
       {children}

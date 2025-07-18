@@ -1,5 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User } from '../types';
+import { supabase } from '../lib/supabase';
+import toast from 'react-hot-toast';
+
+interface User {
+  id: number;
+  nome: string;
+  nome_usuario: string;
+  email: string;
+  funcao: 'usuario' | 'administrador' | 'supervisor' | 'estagiario';
+  empresa_id?: number;
+  setor_id?: number;
+  criado_em: string;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -8,6 +20,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isIntern: boolean;
   isSupervisor: boolean;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -17,6 +30,7 @@ const AuthContext = createContext<AuthContextType>({
   isAdmin: false,
   isIntern: false,
   isSupervisor: false,
+  loading: true,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -26,53 +40,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [isIntern, setIsIntern] = useState<boolean>(false);
   const [isSupervisor, setIsSupervisor] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser);
-      setIsAdmin(parsedUser.role === 'admin');
-      setIsIntern(parsedUser.role === 'intern');
-      setIsSupervisor(parsedUser.role === 'supervisor');
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        setIsAdmin(parsedUser.funcao === 'administrador');
+        setIsIntern(parsedUser.funcao === 'estagiario');
+        setIsSupervisor(parsedUser.funcao === 'supervisor');
+      } catch (error) {
+        console.error('Erro ao carregar usuário do localStorage:', error);
+        localStorage.removeItem('user');
+      }
     }
+    setLoading(false);
   }, []);
 
   const login = async (username: string, password: string): Promise<boolean> => {
-    // Check if there are any users in the system
-    const usersStr = localStorage.getItem('users');
-    let users = usersStr ? JSON.parse(usersStr) : [];
-    
-    // If no users, initialize with the default admin
-    if (users.length === 0) {
-      const defaultAdmin = {
-        id: '1',
-        username: 'admin',
-        password: 'admin',
-        name: 'Administrador',
-        role: 'admin',
-        email: 'admin@example.com',
-        createdAt: new Date().toISOString(),
-      };
+    try {
+      setLoading(true);
       
-      users = [defaultAdmin];
-      localStorage.setItem('users', JSON.stringify(users));
+      // Buscar usuário no Supabase
+      const users = await supabase.getUserByCredentials(username, password);
+      
+      if (users && users.length > 0) {
+        const foundUser = users[0];
+        
+        setUser(foundUser);
+        setIsAdmin(foundUser.funcao === 'administrador');
+        setIsIntern(foundUser.funcao === 'estagiario');
+        setIsSupervisor(foundUser.funcao === 'supervisor');
+        localStorage.setItem('user', JSON.stringify(foundUser));
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Erro no login:', error);
+      toast.error('Erro ao fazer login. Verifique sua conexão.');
+      return false;
+    } finally {
+      setLoading(false);
     }
-    
-    const foundUser = users.find(
-      (u: User) => u.username === username && u.password === password
-    );
-    
-    if (foundUser) {
-      setUser(foundUser);
-      setIsAdmin(foundUser.role === 'admin');
-      setIsIntern(foundUser.role === 'intern');
-      setIsSupervisor(foundUser.role === 'supervisor');
-      localStorage.setItem('user', JSON.stringify(foundUser));
-      return true;
-    }
-    
-    return false;
   };
 
   const logout = () => {
@@ -84,7 +97,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAdmin, isIntern, isSupervisor }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      logout, 
+      isAdmin, 
+      isIntern, 
+      isSupervisor, 
+      loading 
+    }}>
       {children}
     </AuthContext.Provider>
   );

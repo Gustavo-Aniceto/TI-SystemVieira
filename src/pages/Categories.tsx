@@ -8,7 +8,7 @@ interface CategoryFormData {
 }
 
 const Categories = () => {
-  const { categories, addCategory, updateCategory, deleteCategory } = useData();
+  const { categories, addCategory, updateCategory, deleteCategory, loading } = useData();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [currentCategory, setCurrentCategory] = useState<string | null>(null);
@@ -16,6 +16,17 @@ const Categories = () => {
     name: '',
     description: ''
   });
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+          <p className="text-gray-500">Carregando categorias...</p>
+        </div>
+      </div>
+    );
+  }
   
   const resetForm = () => {
     setFormData({ name: '', description: '' });
@@ -30,10 +41,10 @@ const Categories = () => {
   
   const openEditModal = (category: any) => {
     setFormData({
-      name: category.name,
-      description: category.description
+      name: category.nome,
+      description: category.descricao || ''
     });
-    setCurrentCategory(category.id);
+    setCurrentCategory(category.id.toString());
     setModalMode('edit');
     setIsModalOpen(true);
   };
@@ -52,9 +63,15 @@ const Categories = () => {
     e.preventDefault();
     
     if (modalMode === 'add') {
-      addCategory(formData);
+      addCategory({
+        nome: formData.name,
+        descricao: formData.description
+      });
     } else if (modalMode === 'edit' && currentCategory) {
-      updateCategory(currentCategory, formData);
+      updateCategory(parseInt(currentCategory), {
+        nome: formData.name,
+        descricao: formData.description
+      });
     }
     
     closeModal();
@@ -62,7 +79,7 @@ const Categories = () => {
   
   const handleDelete = (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir esta categoria?')) {
-      deleteCategory(id);
+      deleteCategory(parseInt(id));
     }
   };
 
@@ -119,16 +136,16 @@ const Categories = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {categories.map((category) => (
-                  <tr key={category.id} className="hover:bg-gray-50">
+                  <tr key={category.id.toString()} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{category.name}</div>
+                      <div className="text-sm font-medium text-gray-900">{category.nome}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm text-gray-500">{category.description}</div>
+                      <div className="text-sm text-gray-500">{category.descricao || '-'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-500">
-                        {new Date(category.createdAt).toLocaleDateString('pt-BR')}
+                        {new Date(category.criado_em).toLocaleDateString('pt-BR')}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -139,7 +156,7 @@ const Categories = () => {
                         <Edit className="w-5 h-5" />
                       </button>
                       <button
-                        onClick={() => handleDelete(category.id)}
+                        onClick={() => handleDelete(category.id.toString())}
                         className="text-red-600 hover:text-red-900"
                       >
                         <Trash2 className="w-5 h-5" />
