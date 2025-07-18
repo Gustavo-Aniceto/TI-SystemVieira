@@ -3,7 +3,7 @@ import { useData } from '../contexts/DataContext';
 import { Check, X as XIcon, MessageSquare, Filter, FileText, Clock, AlertCircle } from 'lucide-react';
 
 const InternReview = () => {
-  const { activities, users, updateActivity, generateReport } = useData();
+  const { activities, users, updateActivity, generateReport, loading } = useData();
   const [filterIntern, setFilterIntern] = useState<string>('');
   const [filterCategory, setFilterCategory] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<string>('');
@@ -23,16 +23,28 @@ const InternReview = () => {
     action: 'approve'
   });
 
-  const interns = users.filter(user => user.role === 'intern');
+  // Show loading state while data is being fetched
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Carregando dados...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const filteredActivities = activities.filter(activity => {
+  const interns = users?.filter(user => user.role === 'intern') || [];
+
+  const filteredActivities = activities?.filter(activity => {
     if (filterIntern && activity.internId !== filterIntern) return false;
     if (filterCategory && activity.category !== filterCategory) return false;
     if (filterStatus && activity.status !== filterStatus) return false;
     if (filterStartDate && new Date(activity.startDate) < new Date(filterStartDate)) return false;
     if (filterEndDate && new Date(activity.startDate) > new Date(filterEndDate)) return false;
     return true;
-  });
+  }) || [];
 
   const handleStatusChange = (activityId: string, action: 'approve' | 'reject') => {
     setFeedbackModal({
