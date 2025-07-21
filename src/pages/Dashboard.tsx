@@ -241,12 +241,12 @@ const Dashboard = () => {
                   return (
                     <div key={product.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200 hover:border-amber-300 transition-all duration-200">
                       <div className="flex-1">
-                        <h4 className="text-sm font-semibold text-gray-900">{event.titulo}</h4>
-                        <p className="text-xs text-gray-500">{event.descricao}</p>
+                        <h4 className="text-sm font-semibold text-gray-900">{product.nome}</h4>
+                        <p className="text-xs text-gray-500">{category?.nome || 'Categoria não encontrada'}</p>
                       </div>
                       <div className="text-right">
-                            : event.tipo === 'tarefa'
-                          {new Date(event.data_inicio).toLocaleDateString('pt-BR')}
+                        <p className="text-sm font-bold text-amber-700">
+                          {product.quantidade} unidades
                         </p>
                         <p className="text-xs text-amber-600 font-medium">Estoque baixo</p>
                       </div>
