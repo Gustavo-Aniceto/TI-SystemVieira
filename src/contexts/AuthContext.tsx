@@ -1,110 +1,264 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { User, Session } from '@supabase/supabase-js';
 import toast from 'react-hot-toast';
 
-interface User {
-  id: number;
+interface AuthUser {
+  id: string;
+  email: string;
   nome: string;
   nome_usuario: string;
-  email: string;
   funcao: 'usuario' | 'administrador' | 'supervisor' | 'estagiario';
-  empresa_id?: number;
+  empresa_id: number;
   setor_id?: number;
-  criado_em: string;
 }
 
 interface AuthContextType {
-  user: User | null;
-  login: (username: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  user: AuthUser | null;
+  session: Session | null;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<boolean>;
+  signUp: (userData: {
+    email: string;
+    password: string;
+    nome: string;
+    nome_usuario: string;
+    funcao?: 'usuario' | 'administrador' | 'supervisor' | 'estagiario';
+    empresa_id: number;
+    setor_id?: number;
+  }) => Promise<boolean>;
+  signOut: () => Promise<void>;
   isAdmin: boolean;
   isIntern: boolean;
   isSupervisor: boolean;
-  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  login: async () => false,
-  logout: () => {},
+  session: null,
+  loading: true,
+  signIn: async () => false,
+  signUp: async () => false,
+  signOut: async () => {},
   isAdmin: false,
   isIntern: false,
   isSupervisor: false,
-  loading: true,
 });
 
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
-  const [isIntern, setIsIntern] = useState<boolean>(false);
-  const [isSupervisor, setIsSupervisor] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-        setIsAdmin(parsedUser.funcao === 'administrador');
-        setIsIntern(parsedUser.funcao === 'estagiario');
-        setIsSupervisor(parsedUser.funcao === 'supervisor');
-      } catch (error) {
-        console.error('Erro ao carregar usuário do localStorage:', error);
-        localStorage.removeItem('user');
+  // Buscar dados do usuário na tabela usuarios
+  const fetchUserData = async (authUser: User) => {
+    try {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('*')
+        .eq('email', authUser.email)
+        .single();
+
+      if (error) {
+        console.error('Erro ao buscar dados do usuário:', error);
+        return null;
       }
+
+      return {
+        id: authUser.id,
+        email: authUser.email!,
+        nome: data.nome,
+        nome_usuario: data.nome_usuario,
+        funcao: data.funcao,
+        empresa_id: data.empresa_id,
+        setor_id: data.setor_id,
+      };
+    } catch (error) {
+      console.error('Erro ao buscar dados do usuário:', error);
+      return null;
     }
-    setLoading(false);
+  };
+
+  // Verificar sessão inicial
+  useEffect(() => {
+    const getInitialSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Erro ao obter sessão:', error);
+          setLoading(false);
+          return;
+        }
+
+        setSession(session);
+
+        if (session?.user) {
+          const userData = await fetchUserData(session.user);
+          setUser(userData);
+        }
+      } catch (error) {
+        console.error('Erro ao verificar sessão inicial:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    getInitialSession();
+
+    // Escutar mudanças na autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setSession(session);
+        
+        if (session?.user) {
+          const userData = await fetchUserData(session.user);
+          setUser(userData);
+        } else {
+          setUser(null);
+        }
+        
+        setLoading(false);
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const signIn = async (email: string, password: string): Promise<boolean> => {
     try {
       setLoading(true);
       
-      // Buscar usuário no Supabase
-      const users = await supabase.getUserByCredentials(username, password);
-      
-      if (users && users.length > 0) {
-        const foundUser = users[0];
-        
-        setUser(foundUser);
-        setIsAdmin(foundUser.funcao === 'administrador');
-        setIsIntern(foundUser.funcao === 'estagiario');
-        setIsSupervisor(foundUser.funcao === 'supervisor');
-        localStorage.setItem('user', JSON.stringify(foundUser));
-        
-        return true;
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        console.error('Erro no login:', error);
+        toast.error(error.message === 'Invalid login credentials' 
+          ? 'Email ou senha incorretos' 
+          : 'Erro ao fazer login');
+        return false;
       }
-      
+
+      if (data.user) {
+        const userData = await fetchUserData(data.user);
+        if (userData) {
+          setUser(userData);
+          toast.success('Login realizado com sucesso!');
+          return true;
+        } else {
+          toast.error('Usuário não encontrado no sistema');
+          await supabase.auth.signOut();
+          return false;
+        }
+      }
+
       return false;
     } catch (error) {
       console.error('Erro no login:', error);
-      toast.error('Erro ao fazer login. Verifique sua conexão.');
+      toast.error('Erro ao fazer login');
       return false;
     } finally {
       setLoading(false);
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    setIsAdmin(false);
-    setIsIntern(false);
-    setIsSupervisor(false);
-    localStorage.removeItem('user');
+  const signUp = async (userData: {
+    email: string;
+    password: string;
+    nome: string;
+    nome_usuario: string;
+    funcao?: 'usuario' | 'administrador' | 'supervisor' | 'estagiario';
+    empresa_id: number;
+    setor_id?: number;
+  }): Promise<boolean> => {
+    try {
+      setLoading(true);
+
+      // 1. Criar usuário no Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: userData.email,
+        password: userData.password,
+      });
+
+      if (authError) {
+        console.error('Erro ao criar usuário:', authError);
+        toast.error('Erro ao criar conta');
+        return false;
+      }
+
+      if (authData.user) {
+        // 2. Criar registro na tabela usuarios
+        const { error: dbError } = await supabase
+          .from('usuarios')
+          .insert({
+            nome: userData.nome,
+            nome_usuario: userData.nome_usuario,
+            email: userData.email,
+            senha: userData.password, // Em produção, isso seria hasheado
+            funcao: userData.funcao || 'usuario',
+            empresa_id: userData.empresa_id,
+            setor_id: userData.setor_id,
+          });
+
+        if (dbError) {
+          console.error('Erro ao salvar dados do usuário:', dbError);
+          // Limpar usuário do Auth se falhou ao salvar no banco
+          await supabase.auth.signOut();
+          toast.error('Erro ao salvar dados do usuário');
+          return false;
+        }
+
+        toast.success('Conta criada com sucesso!');
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Erro no cadastro:', error);
+      toast.error('Erro ao criar conta');
+      return false;
+    } finally {
+      setLoading(false);
+    }
   };
 
+  const signOut = async (): Promise<void> => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Erro ao fazer logout:', error);
+        toast.error('Erro ao fazer logout');
+      } else {
+        setUser(null);
+        setSession(null);
+        toast.success('Logout realizado com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+      toast.error('Erro ao fazer logout');
+    }
+  };
+
+  const isAdmin = user?.funcao === 'administrador';
+  const isIntern = user?.funcao === 'estagiario';
+  const isSupervisor = user?.funcao === 'supervisor';
+
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      login, 
-      logout, 
-      isAdmin, 
-      isIntern, 
-      isSupervisor, 
-      loading 
+    <AuthContext.Provider value={{
+      user,
+      session,
+      loading,
+      signIn,
+      signUp,
+      signOut,
+      isAdmin,
+      isIntern,
+      isSupervisor,
     }}>
       {children}
     </AuthContext.Provider>

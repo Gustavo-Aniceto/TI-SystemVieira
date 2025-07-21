@@ -26,7 +26,7 @@ import {
 import toast from 'react-hot-toast';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
-  const { user, logout, isAdmin, isIntern, isSupervisor } = useAuth();
+  const { user, signOut, isAdmin, isIntern, isSupervisor } = useAuth();
   const { getLowStockProducts } = useData();
   const location = useLocation();
   const navigate = useNavigate();
@@ -61,8 +61,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   }, [getLowStockProducts, navigate, isAdmin]);
 
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    signOut();
+    // Navigation will be handled by auth state change
   };
 
   const toggleDropdown = (section: string) => {
