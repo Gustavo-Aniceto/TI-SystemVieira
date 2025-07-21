@@ -97,7 +97,7 @@ const Dashboard = () => {
 
     if (link) {
       return (
-        <Link to={link} className="block">
+        <Link to={link} className="block hover:scale-[1.02] transition-transform">
           <CardContent />
         </Link>
       );
@@ -120,7 +120,7 @@ const Dashboard = () => {
         <MetricCard
           title="Computadores"
           value={products.filter(p => {
-            const category = categories.find(c => c.id === p.categoryId);
+            const category = categories.find(c => c.id === p.categoria_id);
             return category?.name.toLowerCase().includes('hardware') || category?.name.toLowerCase().includes('computador');
           }).length}
           icon={<Monitor className="h-8 w-8" />}
@@ -142,7 +142,7 @@ const Dashboard = () => {
         <MetricCard
           title="Dispositivos de Rede"
           value={products.filter(p => {
-            const category = categories.find(c => c.id === p.categoryId);
+            const category = categories.find(c => c.id === p.categoria_id);
             return category?.name.toLowerCase().includes('rede');
           }).length}
           icon={<Layers className="h-8 w-8" />}
@@ -236,17 +236,17 @@ const Dashboard = () => {
             ) : (
               <div className="space-y-4">
                 {lowStockProducts.slice(0, 5).map((product) => {
-                  const category = categories.find(c => c.id === product.categoryId);
+                  const category = categories.find(c => c.id === product.categoria_id);
                   
                   return (
                     <div key={product.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200 hover:border-amber-300 transition-all duration-200">
                       <div className="flex-1">
-                        <h4 className="text-sm font-semibold text-gray-900">{product.name}</h4>
-                        <p className="text-xs text-gray-500">{category?.name || 'Sem categoria'}</p>
+                        <h4 className="text-sm font-semibold text-gray-900">{event.titulo}</h4>
+                        <p className="text-xs text-gray-500">{event.descricao}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-bold text-amber-700">
-                          {product.quantity} / {product.minQuantity}
+                            : event.tipo === 'tarefa'
+                          {new Date(event.data_inicio).toLocaleDateString('pt-BR')}
                         </p>
                         <p className="text-xs text-amber-600 font-medium">Estoque baixo</p>
                       </div>

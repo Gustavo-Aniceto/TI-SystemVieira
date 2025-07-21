@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Package, Plus, Edit, Trash2, X, Filter, AlertTriangle } from 'lucide-react';
+import { Package, Plus, Edit, Trash2, X, Filter, AlertTriangle, Minus, PlusCircle } from 'lucide-react';
 
 interface ProductFormData {
   name: string;
@@ -18,7 +18,7 @@ interface ProductFormData {
 }
 
 const Products = () => {
-  const { products, categories, addProduct, updateProduct, deleteProduct } = useData();
+  const { products, categories, addProduct, updateProduct, deleteProduct, adjustProductQuantity } = useData();
   const location = useLocation();
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -28,6 +28,11 @@ const Products = () => {
   const [filterCategory, setFilterCategory] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [filterLowStock, setFilterLowStock] = useState<boolean>(false);
+  const [quickAdjustModal, setQuickAdjustModal] = useState<{
+    isOpen: boolean;
+    productId: number;
+    productName: string;
+  }>({ isOpen: false, productId: 0, productName: '' });
   const [formData, setFormData] = useState<ProductFormData>({
     name: '',
     description: '',
@@ -149,6 +154,25 @@ const Products = () => {
     setFilterStatus('');
     setFilterLowStock(false);
     navigate('/products');
+  };
+
+  const openQuickAdjustModal = (product: any) => {
+    setQuickAdjustModal({
+      isOpen: true,
+      productId: product.id,
+      productName: product.nome
+    });
+  };
+
+  const closeQuickAdjustModal = () => {
+    setQuickAdjustModal({ isOpen: false, productId: 0, productName: '' });
+  };
+
+  const handleQuickAdjust = async (adjustment: number) => {
+    if (quickAdjustModal.productId) {
+      await adjustProductQuantity(quickAdjustModal.productId, adjustment);
+      closeQuickAdjustModal();
+    }
   };
 
   return (
@@ -336,6 +360,13 @@ const Products = () => {
                           className="text-blue-600 hover:text-blue-900 mr-3"
                         >
                           <Edit className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => openQuickAdjustModal(product)}
+                          className="text-green-600 hover:text-green-900 mr-3"
+                          title="Ajuste rápido de quantidade"
+                        >
+                          <PlusCircle className="w-5 h-5" />
                         </button>
                         <button
                           onClick={() => handleDelete(product.id)}
@@ -555,6 +586,54 @@ const Products = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Adjust Modal */}
+      {quickAdjustModal.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-sm">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Ajuste Rápido</h2>
+              <button onClick={closeQuickAdjustModal} className="text-gray-400 hover:text-gray-500">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="text-center">
+              <p className="text-gray-600 mb-6">
+                <strong>{quickAdjustModal.productName}</strong>
+              </p>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-700">Adicionar</p>
+                  {[1, 5, 10, 25].map(amount => (
+                    <button
+                      key={amount}
+                      onClick={() => handleQuickAdjust(amount)}
+                      className="w-full py-2 px-4 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                    >
+                      +{amount}
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-700">Remover</p>
+                  {[1, 5, 10, 25].map(amount => (
+                    <button
+                      key={amount}
+                      onClick={() => handleQuickAdjust(-amount)}
+                      className="w-full py-2 px-4 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                    >
+                      -{amount}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
