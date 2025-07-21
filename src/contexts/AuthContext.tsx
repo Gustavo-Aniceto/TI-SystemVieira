@@ -18,15 +18,6 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<boolean>;
-  signUp: (userData: {
-    email: string;
-    password: string;
-    nome: string;
-    nome_usuario: string;
-    funcao?: 'usuario' | 'administrador' | 'supervisor' | 'estagiario';
-    empresa_id: number;
-    setor_id?: number;
-  }) => Promise<boolean>;
   signOut: () => Promise<void>;
   isAdmin: boolean;
   isIntern: boolean;
@@ -38,7 +29,6 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   loading: true,
   signIn: async () => false,
-  signUp: async () => false,
   signOut: async () => {},
   isAdmin: false,
   isIntern: false,
@@ -52,13 +42,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Criar usuário admin padrão se não existir
+  const createDefaultAdmin = async () => {
+    try {
+      // Verificar se o admin já existe
+      const { data: existingAdmin } = await supabase
+        .from('usuarios')
+        .select('id')
+        .eq('nome_usuario', 'AdminMaster')
+        .single();
+
+      if (!existingAdmin) {
+        // Criar usuário admin padrão
+        const { error } = await supabase
+          .from('usuarios')
+          .insert({
+            nome: 'Administrador Master',
+            nome_usuario: 'AdminMaster',
+            email: 'admin@vieirastock.com',
+            senha: '@dminM@ster',
+            funcao: 'administrador',
+            empresa_id: 1
+          });
+
+        if (error) {
+          console.error('Erro ao criar admin padrão:', error);
+        } else {
+          console.log('Usuário admin padrão criado com sucesso');
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao verificar/criar admin padrão:', error);
+    }
+  };
+
   // Buscar dados do usuário na tabela usuarios
-  const fetchUserData = async (authUser: User) => {
+  const fetchUserData = async (username: string) => {
     try {
       const { data, error } = await supabase
         .from('usuarios')
-        .select('*')
-        .eq('email', authUser.email)
+        .select('id, nome, nome_usuario, email, funcao, empresa_id, setor_id')
+        .eq('nome_usuario', username)
         .single();
 
       if (error) {
@@ -67,8 +91,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       return {
-        id: authUser.id,
-        email: authUser.email!,
+        id: data.id.toString(),
+        email: data.email,
         nome: data.nome,
         nome_usuario: data.nome_usuario,
         funcao: data.funcao,
@@ -85,18 +109,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const getInitialSession = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // Criar admin padrão se necessário
+        await createDefaultAdmin();
         
-        if (error) {
-          console.error('Erro ao obter sessão:', error);
-          setLoading(false);
-          return;
-        }
-
-        setSession(session);
-
-        if (session?.user) {
-          const userData = await fetchUserData(session.user);
+        // Verificar se há usuário logado no localStorage
+        const storedUser = localStorage.getItem('vieirastock_user');
+        if (storedUser) {
+          const userData = JSON.parse(storedUser);
           setUser(userData);
         }
       } catch (error) {
@@ -107,39 +126,85 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     getInitialSession();
-
-    // Escutar mudanças na autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        
-        if (session?.user) {
-          const userData = await fetchUserData(session.user);
-          setUser(userData);
-        } else {
-          setUser(null);
-        }
-        
-        setLoading(false);
-      }
-    );
-
-    return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (email: string, password: string): Promise<boolean> => {
+  const signIn = async (username: string, password: string): Promise<boolean> => {
     try {
       setLoading(true);
       
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      // Verificar credenciais na tabela usuarios
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('*')
+        .eq('nome_usuario', username)
+        .eq('senha', password)
+        .single();
 
       if (error) {
         console.error('Erro no login:', error);
-        toast.error(error.message === 'Invalid login credentials' 
-          ? 'Email ou senha incorretos' 
+        toast.error('Nome de usuário ou senha incorretos');
+        return false;
+      }
+
+      if (data) {
+        const userData = {
+          id: data.id.toString(),
+          email: data.email,
+          nome: data.nome,
+          nome_usuario: data.nome_usuario,
+          funcao: data.funcao,
+          empresa_id: data.empresa_id,
+          setor_id: data.setor_id,
+        };
+        
+        setUser(userData);
+        localStorage.setItem('vieirastock_user', JSON.stringify(userData));
+        toast.success('Login realizado com sucesso!');
+        return true;
+      } else {
+        toast.error('Usuário não encontrado');
+        return false;
+      }
+    } catch (error) {
+      console.error('Erro no login:', error);
+      toast.error('Erro ao fazer login');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signOut = async (): Promise<void> => {
+    try {
+      setUser(null);
+      setSession(null);
+      localStorage.removeItem('vieirastock_user');
+      toast.success('Logout realizado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+      toast.error('Erro ao fazer logout');
+    }
+  };
+
+  const isAdmin = user?.funcao === 'administrador';
+  const isIntern = user?.funcao === 'estagiario';
+  const isSupervisor = user?.funcao === 'supervisor';
+
+  return (
+    <AuthContext.Provider value={{
+      user,
+      session,
+      loading,
+      signIn,
+      signOut,
+      isAdmin,
+      isIntern,
+      isSupervisor,
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
           : 'Erro ao fazer login');
         return false;
       }

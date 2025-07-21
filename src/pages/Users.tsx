@@ -4,17 +4,17 @@ import { useAuth } from '../contexts/AuthContext';
 import { Users as UsersIcon, Plus, Edit, Trash2, X, ShieldAlert } from 'lucide-react';
 
 interface UserFormData {
-  username: string;
+  nome_usuario: string;
   password: string;
-  name: string;
+  nome: string;
   email: string;
-  role: 'admin' | 'user' | 'intern' | 'supervisor';
-  companyId: string;
-  department: string;
+  funcao: 'usuario' | 'administrador' | 'supervisor' | 'estagiario';
+  empresa_id: number;
+  setor_id?: number;
 }
 
 const Users = () => {
-  const { users, addUser, updateUser, deleteUser, companies } = useData();
+  const { users, addUser, updateUser, deleteUser, companies, sectors } = useData();
   const { user: currentUser } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
@@ -31,13 +31,13 @@ const Users = () => {
   
   const resetForm = () => {
     setFormData({
-      username: '',
+      nome_usuario: '',
       password: '',
-      name: '',
+      nome: '',
       email: '',
-      role: 'user',
-      companyId: companies.length > 0 ? companies[0].id : '',
-      department: ''
+      funcao: 'usuario',
+      empresa_id: companies.length > 0 ? companies[0].id : 1,
+      setor_id: undefined
     });
     setCurrentUserId(null);
   };
@@ -50,15 +50,15 @@ const Users = () => {
   
   const openEditModal = (user: any) => {
     setFormData({
-      username: user.username,
+      nome_usuario: user.nome_usuario,
       password: '', // Don't show the password, but let the user set a new one
-      name: user.name,
+      nome: user.nome,
       email: user.email,
-      role: user.role,
-      companyId: user.companyId || '',
-      department: user.department || ''
+      funcao: user.funcao,
+      empresa_id: user.empresa_id || 1,
+      setor_id: user.setor_id
     });
-    setCurrentUserId(user.id);
+    setCurrentUserId(user.id.toString());
     setModalMode('edit');
     setIsModalOpen(true);
   };
@@ -82,62 +82,64 @@ const Users = () => {
       // If password is empty, don't update it
       const dataToUpdate = { ...formData };
       if (!dataToUpdate.password) {
-        delete dataToUpdate.password;
+        const { password, ...updateData } = dataToUpdate;
+        updateUser(parseInt(currentUserId), updateData);
+      } else {
+        updateUser(parseInt(currentUserId), dataToUpdate);
       }
-      
-      updateUser(currentUserId, dataToUpdate);
     }
     
     closeModal();
   };
   
   const handleDelete = (id: string) => {
-    if (id === currentUser?.id) {
+    if (id === currentUser?.id.toString()) {
       alert('Você não pode excluir seu próprio usuário.');
       return;
     }
     
     if (window.confirm('Tem certeza que deseja excluir este usuário?')) {
-      deleteUser(id);
+      deleteUser(parseInt(id));
     }
   };
 
-  const getRoleDisplay = (role: string) => {
-    switch (role) {
-      case 'admin':
+  const getRoleDisplay = (funcao: string) => {
+    switch (funcao) {
+      case 'administrador':
         return 'Administrador';
-      case 'user':
+      case 'usuario':
         return 'Usuário';
-      case 'intern':
+      case 'estagiario':
         return 'Estagiário';
       case 'supervisor':
         return 'Supervisor';
       default:
-        return role;
+        return funcao;
     }
   };
 
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'admin':
+  const getRoleColor = (funcao: string) => {
+    switch (funcao) {
+      case 'administrador':
         return 'bg-purple-100 text-purple-800';
       case 'supervisor':
         return 'bg-orange-100 text-orange-800';
-      case 'intern':
+      case 'estagiario':
         return 'bg-green-100 text-green-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getCompanyName = (companyId: string) => {
-    const company = companies.find(c => c.id === companyId);
-    return company ? company.name : '-';
+  const getCompanyName = (empresa_id: number) => {
+    const company = companies.find(c => c.id === empresa_id);
+    return company ? company.nome : '-';
   };
 
-  const getAvailableDepartments = (companyId: string) => {
-    const company = companies.find(c => c.id === companyId);
-    return company ? company.departments : [];
+  const getSectorName = (setor_id?: number) => {
+    if (!setor_id) return '-';
+    const sector = sectors.find(s => s.id === setor_id);
+    return sector ? sector.nome : '-';
   };
 
   return (
@@ -184,11 +186,11 @@ const Users = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {users.map((user) => (
-                <tr key={user.id} className={`hover:bg-gray-50 ${user.id === currentUser?.id ? 'bg-blue-50' : ''}`}>
+                <tr key={user.id} className={`hover:bg-gray-50 ${user.id.toString() === currentUser?.id ? 'bg-blue-50' : ''}`}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                      {user.id === currentUser?.id && (
+                      <div className="text-sm font-medium text-gray-900">{user.nome}</div>
+                      {user.id.toString() === currentUser?.id && (
                         <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                           Você
                         </span>
@@ -196,22 +198,22 @@ const Users = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">{user.username}</div>
+                    <div className="text-sm text-gray-500">{user.nome_usuario}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-500">{user.email}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(user.role)}`}>
-                      {user.role === 'admin' && <ShieldAlert className="w-3 h-3 mr-1" />}
-                      {getRoleDisplay(user.role)}
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(user.funcao)}`}>
+                      {user.funcao === 'administrador' && <ShieldAlert className="w-3 h-3 mr-1" />}
+                      {getRoleDisplay(user.funcao)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">{getCompanyName(user.companyId || '')}</div>
+                    <div className="text-sm text-gray-500">{getCompanyName(user.empresa_id)}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">{user.department || '-'}</div>
+                    <div className="text-sm text-gray-500">{getSectorName(user.setor_id)}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
@@ -221,11 +223,11 @@ const Users = () => {
                       <Edit className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => handleDelete(user.id)}
+                      onClick={() => handleDelete(user.id.toString())}
                       className={`text-red-600 hover:text-red-900 ${
-                        user.id === currentUser?.id ? 'opacity-50 cursor-not-allowed' : ''
+                        user.id.toString() === currentUser?.id ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
-                      disabled={user.id === currentUser?.id}
+                      disabled={user.id.toString() === currentUser?.id}
                     >
                       <Trash2 className="w-5 h-5" />
                     </button>
@@ -253,14 +255,14 @@ const Users = () => {
             <form onSubmit={handleSubmit}>
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-1">
                     Nome *
                   </label>
                   <input
                     type="text"
-                    id="name"
-                    name="name"
-                    value={formData.name}
+                    id="nome"
+                    name="nome"
+                    value={formData.nome}
                     onChange={handleChange}
                     required
                     className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -268,14 +270,14 @@ const Users = () => {
                 </div>
                 
                 <div>
-                  <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="nome_usuario" className="block text-sm font-medium text-gray-700 mb-1">
                     Nome de Usuário *
                   </label>
                   <input
                     type="text"
-                    id="username"
-                    name="username"
-                    value={formData.username}
+                    id="nome_usuario"
+                    name="nome_usuario"
+                    value={formData.nome_usuario}
                     onChange={handleChange}
                     required
                     className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -313,64 +315,62 @@ const Users = () => {
                 </div>
                 
                 <div>
-                  <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="funcao" className="block text-sm font-medium text-gray-700 mb-1">
                     Função *
                   </label>
                   <select
-                    id="role"
-                    name="role"
-                    value={formData.role}
+                    id="funcao"
+                    name="funcao"
+                    value={formData.funcao}
                     onChange={handleChange}
                     required
                     className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
-                    <option value="user">Usuário</option>
-                    <option value="admin">Administrador</option>
+                    <option value="usuario">Usuário</option>
+                    <option value="administrador">Administrador</option>
                     <option value="supervisor">Supervisor</option>
-                    <option value="intern">Estagiário</option>
+                    <option value="estagiario">Estagiário</option>
                   </select>
                 </div>
 
                 <div>
-                  <label htmlFor="companyId" className="block text-sm font-medium text-gray-700 mb-1">
-                    Empresa {formData.role === 'supervisor' ? '*' : ''}
+                  <label htmlFor="empresa_id" className="block text-sm font-medium text-gray-700 mb-1">
+                    Empresa *
                   </label>
                   <select
-                    id="companyId"
-                    name="companyId"
-                    value={formData.companyId}
+                    id="empresa_id"
+                    name="empresa_id"
+                    value={formData.empresa_id}
                     onChange={handleChange}
-                    required={formData.role === 'supervisor'}
+                    required
                     className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
-                    <option value="">Selecione uma empresa</option>
                     {companies.map((company) => (
                       <option key={company.id} value={company.id}>
-                        {company.name}
+                        {company.nome}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label htmlFor="department" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="setor_id" className="block text-sm font-medium text-gray-700 mb-1">
                     Setor
                   </label>
-                  <input
-                    type="text"
-                    id="department"
-                    name="department"
-                    value={formData.department}
+                  <select
+                    id="setor_id"
+                    name="setor_id"
+                    value={formData.setor_id || ''}
                     onChange={handleChange}
-                    list="departments"
                     className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    placeholder="Digite ou selecione um setor"
-                  />
-                  <datalist id="departments">
-                    {getAvailableDepartments(formData.companyId).map((dept, index) => (
-                      <option key={index} value={dept} />
+                  >
+                    <option value="">Selecione um setor</option>
+                    {sectors.filter(s => s.empresa_id === formData.empresa_id).map((sector) => (
+                      <option key={sector.id} value={sector.id}>
+                        {sector.nome}
+                      </option>
                     ))}
-                  </datalist>
+                  </select>
                 </div>
               </div>
               
