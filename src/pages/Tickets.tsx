@@ -98,9 +98,14 @@ const Tickets = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     addTicket({
+    // Para supervisores, usar automaticamente a empresa vinculada
+    const ticketData = {
       ...formData,
-      createdBy: user!.id
-    });
+      createdBy: user!.id,
+      // Se for supervisor, usar a empresa do usuário
+      company: isSupervisor ? companies.find(c => c.id === user?.empresa_id)?.nome || formData.company : formData.company
+    };
+    addTicket(ticketData);
     closeModal();
   };
 

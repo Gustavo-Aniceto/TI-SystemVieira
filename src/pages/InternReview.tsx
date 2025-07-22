@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useData } from '../contexts/DataContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Check, X as XIcon, MessageSquare, Filter, FileText, Clock, AlertCircle } from 'lucide-react';
 
 const InternReview = () => {

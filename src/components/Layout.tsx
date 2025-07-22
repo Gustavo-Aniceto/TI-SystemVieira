@@ -248,6 +248,12 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                user?.role === 'supervisor' ? 'Supervisor' : 'Usuário'}
             </p>
           </div>
+          
+          {/* Intern Activities */}
+          {isIntern && (
+            <NavItem to="/intern-activities" icon={<ClipboardList size={20} />} label="Minhas Atividades" />
+          )}
+          
           <button
             onClick={handleLogout}
             className="flex items-center w-full px-4 py-2 text-sm text-gray-700 rounded-lg hover:bg-red-50 hover:text-red-700 transition-all duration-200"

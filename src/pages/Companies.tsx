@@ -236,7 +236,7 @@ const Companies = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Setores
+                    Setores da Empresa
                   </label>
                   <div className="space-y-2">
                     {formData.departments.map((dept, index) => (

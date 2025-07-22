@@ -70,6 +70,12 @@ interface TicketType {
   nome: string;
 }
 
+interface TicketSubtype {
+  id: number;
+  tipo_id: number;
+  nome: string;
+}
+
 interface Ticket {
   id: number;
   problema: string;
