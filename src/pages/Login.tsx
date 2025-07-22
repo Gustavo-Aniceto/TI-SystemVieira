@@ -10,7 +10,7 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const { signIn, loading } = useAuth();
+  const { login, loading } = useAuth();
   const navigate = useNavigate();
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -24,7 +24,7 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      const success = await signIn(username, password);
+      const success = await login(username, password);
       
       if (success) {
         navigate('/');
