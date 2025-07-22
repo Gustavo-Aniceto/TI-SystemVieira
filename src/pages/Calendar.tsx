@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useData } from '../contexts/DataContext';
-import { CalendarIcon, ChevronLeft, ChevronRight, Plus, Edit, Trash2, X } from 'lucide-react';
+import { CalendarIcon, ChevronLeft, ChevronRight, Plus, Edit, Trash2, X, Filter } from 'lucide-react';
 
 interface CalendarFormData {
   title: string;
@@ -14,12 +14,16 @@ interface CalendarFormData {
 }
 
 const Calendar = () => {
-  const { events, addEvent, updateEvent, deleteEvent } = useData();
+  const { events, tickets, addEvent, updateEvent, deleteEvent, sectors, ticketTypes } = useData();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [currentEvent, setCurrentEvent] = useState<string | null>(null);
+  const [showTickets, setShowTickets] = useState(true);
+  const [filterType, setFilterType] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState<string>('');
+  const [filterSector, setFilterSector] = useState<string>('');
   const [formData, setFormData] = useState<CalendarFormData>({
     title: '',
     description: '',
@@ -158,14 +162,31 @@ const Calendar = () => {
     while (day <= endDate) {
       for (let i = 0; i < 7; i++) {
         const formattedDate = format(day, 'yyyy-MM-dd');
-        const eventsForDay = events.filter((event) => {
+        
+        // Get events for the day
+        let eventsForDay = events.filter((event) => {
           const eventStart = new Date(event.startDate);
           const eventEnd = new Date(event.endDate);
           const currentDay = new Date(day);
           
-          // Check if the current day is within the event's date range
           return currentDay >= eventStart && currentDay <= eventEnd;
         });
+        
+        // Get tickets for the day (if enabled)
+        let ticketsForDay: any[] = [];
+        if (showTickets) {
+          ticketsForDay = tickets.filter((ticket) => {
+            const ticketDate = new Date(ticket.criado_em);
+            const currentDay = new Date(day);
+            
+            // Apply filters
+            if (filterType && ticket.tipo_id?.toString() !== filterType) return false;
+            if (filterStatus && ticket.status !== filterStatus) return false;
+            if (filterSector && ticket.setor_id?.toString() !== filterSector) return false;
+            
+            return isSameDay(ticketDate, currentDay);
+          });
+        }
         
         days.push(
           <div
@@ -200,6 +221,7 @@ const Calendar = () => {
               )}
             </div>
             <div className="mt-1 space-y-1 max-h-24 overflow-y-auto">
+              {/* Events */}
               {eventsForDay.map((event) => (
                 <div
                   key={event.id}
@@ -209,11 +231,22 @@ const Calendar = () => {
                   }}
                   className="text-xs p-1 rounded truncate cursor-pointer"
                   style={{
-                    backgroundColor: event.color ? `${event.color}20` : '#3b82f620',
-                    borderLeft: `3px solid ${event.color || '#3b82f6'}`
+                    backgroundColor: event.cor ? `${event.cor}20` : '#3b82f620',
+                    borderLeft: `3px solid ${event.cor || '#3b82f6'}`
                   }}
                 >
-                  {event.title}
+                  {event.titulo}
+                </div>
+              ))}
+              
+              {/* Tickets */}
+              {ticketsForDay.map((ticket) => (
+                <div
+                  key={`ticket-${ticket.id}`}
+                  className="text-xs p-1 rounded truncate bg-red-50 border-l-3 border-red-400 text-red-800"
+                  title={`Chamado #${ticket.id}: ${ticket.problema}`}
+                >
+                  #{ticket.id.toString().padStart(4, '0')}
                 </div>
               ))}
             </div>
@@ -237,20 +270,37 @@ const Calendar = () => {
   
   const renderEvents = () => {
     // Get events for the selected date
-    const selectedDateEvents = events.filter((event) => {
-      const eventStart = new Date(event.startDate);
-      const eventEnd = new Date(event.endDate);
+    let selectedDateEvents = events.filter((event) => {
+      const eventStart = new Date(event.data_inicio);
+      const eventEnd = new Date(event.data_termino);
       
       return (
         selectedDate >= eventStart && selectedDate <= eventEnd
       );
     });
     
-    if (selectedDateEvents.length === 0) {
+    // Get tickets for the selected date
+    let selectedDateTickets: any[] = [];
+    if (showTickets) {
+      selectedDateTickets = tickets.filter((ticket) => {
+        const ticketDate = new Date(ticket.criado_em);
+        
+        // Apply filters
+        if (filterType && ticket.tipo_id?.toString() !== filterType) return false;
+        if (filterStatus && ticket.status !== filterStatus) return false;
+        if (filterSector && ticket.setor_id?.toString() !== filterSector) return false;
+        
+        return isSameDay(ticketDate, selectedDate);
+      });
+    }
+    
+    const totalItems = selectedDateEvents.length + selectedDateTickets.length;
+    
+    if (totalItems === 0) {
       return (
         <div className="text-center py-4">
           <p className="text-gray-500">
-            Nenhum evento para {format(selectedDate, 'dd/MM/yyyy')}
+            Nenhum item para {format(selectedDate, 'dd/MM/yyyy')}
           </p>
           <button
             onClick={() => openAddModal()}
@@ -267,7 +317,7 @@ const Calendar = () => {
       <div className="space-y-3">
         <div className="flex justify-between items-center">
           <h3 className="text-lg font-medium text-gray-900">
-            Eventos em {format(selectedDate, 'dd/MM/yyyy')}
+            Itens em {format(selectedDate, 'dd/MM/yyyy')}
           </h3>
           <button
             onClick={() => openAddModal()}
@@ -279,6 +329,7 @@ const Calendar = () => {
         </div>
         
         <div className="space-y-2">
+          {/* Events */}
           {selectedDateEvents.map((event) => (
             <div
               key={event.id}
@@ -289,17 +340,17 @@ const Calendar = () => {
                   <div className="flex items-center">
                     <div
                       className="w-3 h-3 rounded-full mr-2"
-                      style={{ backgroundColor: event.color || '#3b82f6' }}
+                      style={{ backgroundColor: event.cor || '#3b82f6' }}
                     ></div>
-                    <h4 className="text-base font-medium text-gray-900">{event.title}</h4>
+                    <h4 className="text-base font-medium text-gray-900">{event.titulo}</h4>
                   </div>
-                  <p className="text-sm text-gray-500 mt-1">{event.description}</p>
+                  <p className="text-sm text-gray-500 mt-1">{event.descricao}</p>
                   <div className="flex items-center mt-2 text-xs text-gray-500">
                     <CalendarIcon className="w-3.5 h-3.5 mr-1" />
                     <span>
-                      {format(new Date(event.startDate), 'dd/MM/yyyy')}
-                      {event.startDate !== event.endDate && 
-                        ` - ${format(new Date(event.endDate), 'dd/MM/yyyy')}`}
+                      {format(new Date(event.data_inicio), 'dd/MM/yyyy')}
+                      {event.data_inicio !== event.data_termino && 
+                        ` - ${format(new Date(event.data_termino), 'dd/MM/yyyy')}`}
                     </span>
                   </div>
                 </div>
@@ -320,6 +371,36 @@ const Calendar = () => {
               </div>
             </div>
           ))}
+          
+          {/* Tickets */}
+          {selectedDateTickets.map((ticket) => (
+            <div
+              key={`ticket-${ticket.id}`}
+              className="bg-red-50 p-3 rounded-lg border border-red-200"
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 rounded-full mr-2 bg-red-500"></div>
+                    <h4 className="text-base font-medium text-gray-900">
+                      Chamado #{ticket.id.toString().padStart(4, '0')}
+                    </h4>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">{ticket.problema}</p>
+                  <div className="flex items-center mt-2 text-xs text-gray-500">
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                      ticket.status === 'aberto' ? 'bg-red-100 text-red-800' :
+                      ticket.status === 'em_andamento' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-green-100 text-green-800'
+                    }`}>
+                      {ticket.status === 'aberto' ? 'Aberto' :
+                       ticket.status === 'em_andamento' ? 'Em Andamento' : 'Resolvido'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -328,15 +409,108 @@ const Calendar = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Calendário</h1>
-        <button
-          onClick={() => openAddModal()}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-        >
-          <Plus className="w-5 h-5 mr-1" />
-          Novo Evento
-        </button>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Calendário</h1>
+          <p className="mt-1 text-sm text-gray-600">
+            Visualize eventos e chamados em um calendário integrado
+          </p>
+        </div>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setShowTickets(!showTickets)}
+            className={`px-3 py-2 text-sm rounded-md transition-colors ${
+              showTickets 
+                ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            {showTickets ? 'Ocultar' : 'Mostrar'} Chamados
+          </button>
+          <button
+            onClick={() => openAddModal()}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+          >
+            <Plus className="w-5 h-5 mr-1" />
+            Novo Evento
+          </button>
+        </div>
       </div>
+      
+      {/* Filters */}
+      {showTickets && (
+        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+          <div className="flex items-center mb-3">
+            <Filter className="w-5 h-5 text-gray-400 mr-2" />
+            <span className="text-sm font-medium text-gray-700">Filtros de Chamados:</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tipo
+              </label>
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className="block w-full rounded-md border border-gray-300 py-2 px-3 text-sm"
+              >
+                <option value="">Todos os tipos</option>
+                {ticketTypes.map(type => (
+                  <option key={type.id} value={type.id}>
+                    {type.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Status
+              </label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="block w-full rounded-md border border-gray-300 py-2 px-3 text-sm"
+              >
+                <option value="">Todos os status</option>
+                <option value="aberto">Aberto</option>
+                <option value="em_andamento">Em Andamento</option>
+                <option value="resolvido">Resolvido</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Setor
+              </label>
+              <select
+                value={filterSector}
+                onChange={(e) => setFilterSector(e.target.value)}
+                className="block w-full rounded-md border border-gray-300 py-2 px-3 text-sm"
+              >
+                <option value="">Todos os setores</option>
+                {sectors.map(sector => (
+                  <option key={sector.id} value={sector.id}>
+                    {sector.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          
+          <div className="mt-3 flex justify-end">
+            <button
+              onClick={() => {
+                setFilterType('');
+                setFilterStatus('');
+                setFilterSector('');
+              }}
+              className="text-sm text-gray-600 hover:text-gray-900"
+            >
+              Limpar Filtros
+            </button>
+          </div>
+        </div>
+      )}
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white rounded-lg border border-gray-200 shadow-sm p-4">

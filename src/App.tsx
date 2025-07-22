@@ -10,6 +10,9 @@ import Calendar from './pages/Calendar';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
 import Companies from './pages/Companies';
+import Sectors from './pages/Sectors';
+import TicketTypes from './pages/TicketTypes';
+import TicketHistory from './pages/TicketHistory';
 import Notes from './pages/Notes';
 import PasswordManager from './pages/PasswordManager';
 import Tickets from './pages/Tickets';
@@ -105,6 +108,21 @@ const AuthenticatedApp = () => {
           <Route path="companies" element={
             <ProtectedRoute roles={['administrador']}>
               <Companies />
+            </ProtectedRoute>
+          } />
+          <Route path="sectors" element={
+            <ProtectedRoute roles={['administrador']}>
+              <Sectors />
+            </ProtectedRoute>
+          } />
+          <Route path="ticket-types" element={
+            <ProtectedRoute roles={['administrador']}>
+              <TicketTypes />
+            </ProtectedRoute>
+          } />
+          <Route path="ticket-history" element={
+            <ProtectedRoute roles={['administrador']}>
+              <TicketHistory />
             </ProtectedRoute>
           } />
           <Route path="*" element={<NotFound />} />

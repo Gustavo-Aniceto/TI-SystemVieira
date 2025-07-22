@@ -65,6 +65,11 @@ interface Sector {
   criado_em: string;
 }
 
+interface TicketType {
+  id: number;
+  nome: string;
+}
+
 interface Ticket {
   id: number;
   problema: string;
@@ -161,6 +166,18 @@ interface DataContextType {
   updateTicket: (id: number, ticket: Partial<Ticket>) => Promise<void>;
   deleteTicket: (id: number) => Promise<void>;
   
+  // Ticket Types
+  ticketTypes: TicketType[];
+  addTicketType: (type: Omit<TicketType, 'id'>) => Promise<void>;
+  updateTicketType: (id: number, type: Partial<TicketType>) => Promise<void>;
+  deleteTicketType: (id: number) => Promise<void>;
+  
+  // Ticket Subtypes
+  ticketSubtypes: TicketSubtype[];
+  addTicketSubtype: (subtype: Omit<TicketSubtype, 'id'>) => Promise<void>;
+  updateTicketSubtype: (id: number, subtype: Partial<TicketSubtype>) => Promise<void>;
+  deleteTicketSubtype: (id: number) => Promise<void>;
+  
   // Reports
   generateReport: (type: string, filters: any) => void;
   
@@ -184,6 +201,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [passwords, setPasswords] = useState<PasswordEntry[]>([]);
+  const [ticketTypes, setTicketTypes] = useState<TicketType[]>([]);
+  const [ticketSubtypes, setTicketSubtypes] = useState<TicketSubtype[]>([]);
 
   // Função para carregar todos os dados
   const loadData = async () => {
@@ -204,7 +223,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sectorsData,
         ticketsData,
         notesData,
-        passwordsData
+        passwordsData,
+        ticketTypesData,
+        ticketSubtypesData
       ] = await Promise.all([
         supabase.from('categorias').select('*').order('nome'),
         supabase.from('produtos').select('*').order('nome'),
@@ -214,7 +235,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         supabase.from('setores').select('*').order('nome'),
         supabase.from('chamados').select('*').order('criado_em', { ascending: false }),
         supabase.from('anotacoes').select('*').order('criado_em', { ascending: false }),
-        supabase.from('senhas').select('*').order('sistema')
+        supabase.from('senhas').select('*').order('sistema'),
+        supabase.from('chamados_tipos').select('*').order('nome'),
+        supabase.from('chamados_subtipos').select('*').order('nome')
       ]);
 
       setCategories(categoriesData.data || []);
@@ -226,6 +249,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setTickets(ticketsData.data || []);
       setNotes(notesData.data || []);
       setPasswords(passwordsData.data || []);
+      setTicketTypes(ticketTypesData.data || []);
+      setTicketSubtypes(ticketSubtypesData.data || []);
       
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -852,6 +877,120 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Ticket Type operations
+  const addTicketType = async (typeData: Omit<TicketType, 'id'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('chamados_tipos')
+        .insert(typeData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setTicketTypes(prev => [...prev, data]);
+      toast.success('Tipo de chamado adicionado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao adicionar tipo de chamado:', error);
+      toast.error('Erro ao adicionar tipo de chamado');
+    }
+  };
+
+  const updateTicketType = async (id: number, typeData: Partial<TicketType>) => {
+    try {
+      const { data, error } = await supabase
+        .from('chamados_tipos')
+        .update(typeData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setTicketTypes(prev => 
+        prev.map(type => type.id === id ? { ...type, ...data } : type)
+      );
+      toast.success('Tipo de chamado atualizado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao atualizar tipo de chamado:', error);
+      toast.error('Erro ao atualizar tipo de chamado');
+    }
+  };
+
+  const deleteTicketType = async (id: number) => {
+    try {
+      const { error } = await supabase
+        .from('chamados_tipos')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setTicketTypes(prev => prev.filter(type => type.id !== id));
+      toast.success('Tipo de chamado excluído com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir tipo de chamado:', error);
+      toast.error('Erro ao excluir tipo de chamado');
+    }
+  };
+
+  // Ticket Subtype operations
+  const addTicketSubtype = async (subtypeData: Omit<TicketSubtype, 'id'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('chamados_subtipos')
+        .insert(subtypeData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setTicketSubtypes(prev => [...prev, data]);
+      toast.success('Subtipo de chamado adicionado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao adicionar subtipo de chamado:', error);
+      toast.error('Erro ao adicionar subtipo de chamado');
+    }
+  };
+
+  const updateTicketSubtype = async (id: number, subtypeData: Partial<TicketSubtype>) => {
+    try {
+      const { data, error } = await supabase
+        .from('chamados_subtipos')
+        .update(subtypeData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setTicketSubtypes(prev => 
+        prev.map(subtype => subtype.id === id ? { ...subtype, ...data } : subtype)
+      );
+      toast.success('Subtipo de chamado atualizado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao atualizar subtipo de chamado:', error);
+      toast.error('Erro ao atualizar subtipo de chamado');
+    }
+  };
+
+  const deleteTicketSubtype = async (id: number) => {
+    try {
+      const { error } = await supabase
+        .from('chamados_subtipos')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setTicketSubtypes(prev => prev.filter(subtype => subtype.id !== id));
+      toast.success('Subtipo de chamado excluído com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir subtipo de chamado:', error);
+      toast.error('Erro ao excluir subtipo de chamado');
+    }
+  };
+
   // Reports
   const generateReport = (type: string, filters: any) => {
     let data: any[] = [];
@@ -975,6 +1114,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addTicket,
         updateTicket,
         deleteTicket,
+        
+        ticketTypes,
+        addTicketType,
+        updateTicketType,
+        deleteTicketType,
+        
+        ticketSubtypes,
+        addTicketSubtype,
+        updateTicketSubtype,
+        deleteTicketSubtype,
         
         generateReport,
         refreshData

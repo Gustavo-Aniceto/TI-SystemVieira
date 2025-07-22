@@ -208,15 +208,13 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             icon={<Settings size={20} />} 
             sectionKey="configuracoes"
           >
-            {!isIntern && !isSupervisor && (
-              isAdmin && (
-                <SubNavItem to="/reports" icon={<FileText size={16} />} label="Relatórios" />
-              )
-            )}
             {isAdmin && (
               <>
+                <SubNavItem to="/reports" icon={<FileText size={16} />} label="Relatórios" />
                 <SubNavItem to="/users" icon={<Users size={16} />} label="Usuários" />
                 <SubNavItem to="/companies" icon={<Building2 size={16} />} label="Empresas" />
+                <SubNavItem to="/sectors" icon={<Building2 size={16} />} label="Setores" />
+                <SubNavItem to="/ticket-types" icon={<Ticket size={16} />} label="Tipos de Chamado" />
               </>
             )}
           </DropdownSection>
@@ -230,6 +228,9 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             <SubNavItem to="/calendar" icon={<CalendarIcon size={16} />} label="Calendário" />
             <SubNavItem to="/notes" icon={<StickyNote size={16} />} label="Anotações" />
             <SubNavItem to="/password-manager" icon={<Key size={16} />} label="Gerenciador de Senhas" />
+            {isAdmin && (
+              <SubNavItem to="/ticket-history" icon={<ClipboardList size={16} />} label="Histórico de Chamados" />
+            )}
           </DropdownSection>
           
           {/* Intern Activities */}

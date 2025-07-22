@@ -7,6 +7,9 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   loading: boolean;
+  isAdmin: boolean;
+  isSupervisor: boolean;
+  isIntern: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -149,11 +152,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('currentUser');
   };
 
+  const isAdmin = user?.funcao === 'administrador';
+  const isSupervisor = user?.funcao === 'supervisor';
+  const isIntern = user?.funcao === 'estagiario';
+
   const value = {
     user,
     login,
     logout,
-    loading
+    loading,
+    isAdmin,
+    isSupervisor,
+    isIntern
   };
 
   return (
