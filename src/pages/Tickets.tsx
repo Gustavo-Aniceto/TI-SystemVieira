@@ -26,10 +26,8 @@ interface Ticket {
 
 const Tickets: React.FC = () => {
   const { user } = useAuth();
-  const { empresas, setores, usuarios } = useData();
+  const { companies, sectors, users, ticketTypes, ticketSubtypes } = useData();
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [tipos, setTipos] = useState<any[]>([]);
-  const [subtipos, setSubtipos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
@@ -50,7 +48,6 @@ const Tickets: React.FC = () => {
 
   useEffect(() => {
     fetchTickets();
-    fetchTipos();
   }, []);
 
   const fetchTickets = async () => {
@@ -73,28 +70,6 @@ const Tickets: React.FC = () => {
       console.error('Erro ao buscar chamados:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchTipos = async () => {
-    try {
-      const { data: tiposData, error: tiposError } = await supabase
-        .from('tipos_chamado')
-        .select('*')
-        .order('nome');
-
-      if (tiposError) throw tiposError;
-      setTipos(tiposData || []);
-
-      const { data: subtiposData, error: subtiposError } = await supabase
-        .from('subtipos_chamado')
-        .select('*')
-        .order('nome');
-
-      if (subtiposError) throw subtiposError;
-      setSubtipos(subtiposData || []);
-    } catch (error) {
-      console.error('Erro ao buscar tipos:', error);
     }
   };
 

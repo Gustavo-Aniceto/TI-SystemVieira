@@ -132,9 +132,6 @@ const Companies = () => {
                     Descrição
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Setores
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Data de Criação
                   </th>
                   <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -150,18 +147,6 @@ const Companies = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-500">{company.description || '-'}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-1">
-                        {company.departments.map((dept, index) => (
-                          <span
-                            key={index}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                          >
-                            {dept}
-                          </span>
-                        ))}
-                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-500">
@@ -232,48 +217,6 @@ const Companies = () => {
                     rows={3}
                     className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   ></textarea>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Setores da Empresa
-                  </label>
-                  <div className="space-y-2">
-                    {formData.departments.map((dept, index) => (
-                      <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded-md">
-                        <span className="text-sm text-gray-700">{dept}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeDepartment(index)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                    <div className="flex items-center">
-                      <input
-                        type="text"
-                        value={newDepartment}
-                        onChange={(e) => setNewDepartment(e.target.value)}
-                        placeholder="Novo setor"
-                        className="flex-1 rounded-md border border-gray-300 py-1 px-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            addDepartment();
-                          }
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={addDepartment}
-                        className="ml-2 p-1 text-blue-600 hover:text-blue-800"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
                 </div>
               </div>
               

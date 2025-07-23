@@ -443,7 +443,7 @@ const Products = () => {
                     <option value="" disabled>Selecione uma categoria</option>
                     {categories.map((category) => (
                       <option key={category.id} value={category.id}>
-                        {category.name}
+                        {category.nome}
                       </option>
                     ))}
                   </select>

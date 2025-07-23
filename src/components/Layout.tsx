@@ -190,15 +190,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
               icon={<Archive size={20} />} 
               sectionKey="estoque"
             >
-              {!isIntern && (
-                <>
-                  <SubNavItem to="/categories" icon={<Layers size={16} />} label="Categorias" />
-                  <SubNavItem to="/products" icon={<Package size={16} />} label="Produtos" />
-                </>
-              )}
-              {(isAdmin || (!isIntern && !isSupervisor)) && (
-                <SubNavItem to="/intern-review" icon={<UserCheck size={16} />} label="Revisão de Estagiários" />
-              )}
+              <SubNavItem to="/categories" icon={<Layers size={16} />} label="Categorias" />
+              <SubNavItem to="/products" icon={<Package size={16} />} label="Produtos" />
             </DropdownSection>
           )}
           
@@ -249,14 +242,9 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             </p>
           </div>
           
-          {/* Intern Activities */}
-          {isIntern && (
-            <NavItem to="/intern-activities" icon={<ClipboardList size={20} />} label="Minhas Atividades" />
-          )}
-          
           <button
             onClick={handleLogout}
-            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 rounded-lg hover:bg-red-50 hover:text-red-700 transition-all duration-200"
+            className="flex items-center w-full px-4 py-2 text-sm text-red-600 rounded-lg hover:bg-red-50 hover:text-red-700 transition-all duration-200 font-medium"
           >
             <LogOut size={18} className="mr-2" />
             <span>Sair</span>

@@ -120,11 +120,6 @@ const AuthenticatedApp = () => {
               <TicketTypes />
             </ProtectedRoute>
           } />
-          <Route path="ticket-history" element={
-            <ProtectedRoute roles={['administrador']}>
-              <TicketHistory />
-            </ProtectedRoute>
-          } />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Layout>

@@ -150,6 +150,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('currentUser');
+    window.location.href = '/login';
   };
 
   const isAdmin = user?.funcao === 'administrador';
