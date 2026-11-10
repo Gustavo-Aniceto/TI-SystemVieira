@@ -28,9 +28,12 @@ const Login = () => {
       
       if (success) {
         navigate('/');
+      } else {
+        toast.error('Usuário ou senha inválidos');
       }
     } catch (error) {
       console.error('Erro no login:', error);
+      toast.error('Não foi possível conectar ao servidor');
     } finally {
       setIsLoading(false);
     }

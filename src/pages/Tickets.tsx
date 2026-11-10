@@ -1,224 +1,203 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Eye, Edit, Trash2, Clock, User, Building, MapPin } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Plus, Search, Edit, Trash2, Clock, User, Building, MapPin, Paperclip, KeyRound, X, Ticket as TicketIcon } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
+import { Ticket, TicketStatus, TICKET_STATUS_LABELS } from '../types';
 
-interface Ticket {
-  id: number;
+interface TicketFormData {
   problema: string;
-  supervisor_id: number;
+  supervisor_id: string;
   posicao_operador: string;
-  empresa_id: number;
-  setor_id: number;
+  empresa_id: string;
+  setor_id: string;
   id_acesso: string;
   anexo: string;
-  status: 'aberto' | 'em_andamento' | 'resolvido';
-  criado_em: string;
-  tipo_id?: number;
-  subtipo_id?: number;
-  supervisor?: { nome: string };
-  empresa?: { nome: string };
-  setor?: { nome: string };
-  tipo?: { nome: string };
-  subtipo?: { nome: string };
+  tipo_id: string;
+  subtipo_id: string;
 }
 
+const STATUS_COLORS: Record<TicketStatus, string> = {
+  aberto: 'bg-red-100 text-red-800',
+  em_andamento: 'bg-yellow-100 text-yellow-800',
+  resolvido: 'bg-green-100 text-green-800',
+};
+
+const inputClass =
+  'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100';
+
+const isSafeUrl = (value: string) => /^https?:\/\//i.test(value);
+
 const Tickets: React.FC = () => {
-  const { user } = useAuth();
-  const { empresas, setores, usuarios } = useData();
-  const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [tipos, setTipos] = useState<any[]>([]);
-  const [subtipos, setSubtipos] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user, isSupervisor, isAdmin } = useAuth();
+  const {
+    tickets, users, companies, sectors, ticketTypes, ticketSubtypes,
+    addTicket, updateTicket, deleteTicket, loading,
+  } = useData();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showModal, setShowModal] = useState(false);
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
+  const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') ?? '');
 
-  const [formData, setFormData] = useState({
+  // Mantém o filtro de status sincronizado com a URL (links do dashboard)
+  useEffect(() => {
+    setStatusFilter(searchParams.get('status') ?? '');
+  }, [searchParams]);
+
+  const changeStatusFilter = (value: string) => {
+    setStatusFilter(value);
+    setSearchParams(value ? { status: value } : {});
+  };
+
+  const emptyForm = (): TicketFormData => ({
     problema: '',
-    supervisor_id: '',
+    supervisor_id: isSupervisor && user ? String(user.id) : '',
     posicao_operador: '',
-    empresa_id: '',
-    setor_id: '',
+    empresa_id: isSupervisor && user?.empresa_id ? String(user.empresa_id) : '',
+    setor_id: isSupervisor && user?.setor_id ? String(user.setor_id) : '',
     id_acesso: '',
     anexo: '',
     tipo_id: '',
-    subtipo_id: ''
+    subtipo_id: '',
   });
+  const [formData, setFormData] = useState<TicketFormData>(emptyForm);
 
-  useEffect(() => {
-    fetchTickets();
-    fetchTipos();
-  }, []);
+  const nameOf = <T extends { id: number; nome: string }>(list: T[], id: number | null) =>
+    list.find(item => item.id === id)?.nome ?? '';
 
-  const fetchTickets = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('chamados')
-        .select(`
-          *,
-          supervisor:usuarios!supervisor_id(nome),
-          empresa:empresas(nome),
-          setor:setores(nome),
-          tipo:tipos_chamado(nome),
-          subtipo:subtipos_chamado(nome)
-        `)
-        .order('criado_em', { ascending: false });
+  // Supervisores enxergam apenas os chamados da própria empresa
+  const visibleTickets = useMemo(
+    () => (isSupervisor ? tickets.filter(t => t.empresa_id === user?.empresa_id) : tickets),
+    [tickets, isSupervisor, user?.empresa_id]
+  );
 
-      if (error) throw error;
-      setTickets(data || []);
-    } catch (error) {
-      console.error('Erro ao buscar chamados:', error);
-    } finally {
-      setLoading(false);
+  const filteredTickets = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return visibleTickets.filter(ticket => {
+      const matchesStatus = !statusFilter || ticket.status === statusFilter;
+      if (!matchesStatus) return false;
+      if (!term) return true;
+      return [
+        ticket.problema,
+        `#${ticket.id}`,
+        nameOf(users, ticket.supervisor_id),
+        nameOf(companies, ticket.empresa_id),
+        nameOf(sectors, ticket.setor_id),
+        ticket.posicao_operador ?? '',
+      ].some(value => value.toLowerCase().includes(term));
+    });
+  }, [visibleTickets, searchTerm, statusFilter, users, companies, sectors]);
+
+  const supervisorOptions = users.filter(
+    u => u.funcao === 'supervisor' && (!formData.empresa_id || u.empresa_id === Number(formData.empresa_id))
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  const openNew = () => {
+    if (isSupervisor && !user?.empresa_id) {
+      toast.error('Seu usuário não está vinculado a uma empresa. Contate o administrador.');
+      return;
     }
-  };
-
-  const fetchTipos = async () => {
-    try {
-      const { data: tiposData, error: tiposError } = await supabase
-        .from('tipos_chamado')
-        .select('*')
-        .order('nome');
-
-      if (tiposError) throw tiposError;
-      setTipos(tiposData || []);
-
-      const { data: subtiposData, error: subtiposError } = await supabase
-        .from('subtipos_chamado')
-        .select('*')
-        .order('nome');
-
-      if (subtiposError) throw subtiposError;
-      setSubtipos(subtiposData || []);
-    } catch (error) {
-      console.error('Erro ao buscar tipos:', error);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    try {
-      const ticketData = {
-        ...formData,
-        supervisor_id: parseInt(formData.supervisor_id),
-        empresa_id: user?.funcao === 'supervisor' ? user.empresa_id : parseInt(formData.empresa_id),
-        setor_id: parseInt(formData.setor_id),
-        tipo_id: formData.tipo_id ? parseInt(formData.tipo_id) : null,
-        subtipo_id: formData.subtipo_id ? parseInt(formData.subtipo_id) : null
-      };
-
-      if (editingTicket) {
-        const { error } = await supabase
-          .from('chamados')
-          .update(ticketData)
-          .eq('id', editingTicket.id);
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('chamados')
-          .insert([ticketData]);
-
-        if (error) throw error;
-      }
-
-      setShowModal(false);
-      setEditingTicket(null);
-      setFormData({
-        problema: '',
-        supervisor_id: '',
-        posicao_operador: '',
-        empresa_id: '',
-        setor_id: '',
-        id_acesso: '',
-        anexo: '',
-        tipo_id: '',
-        subtipo_id: ''
-      });
-      fetchTickets();
-    } catch (error) {
-      console.error('Erro ao salvar chamado:', error);
-      alert('Erro ao salvar chamado');
-    }
+    setEditingTicket(null);
+    setFormData(emptyForm());
+    setShowModal(true);
   };
 
   const handleEdit = (ticket: Ticket) => {
     setEditingTicket(ticket);
     setFormData({
       problema: ticket.problema,
-      supervisor_id: ticket.supervisor_id.toString(),
-      posicao_operador: ticket.posicao_operador || '',
-      empresa_id: ticket.empresa_id.toString(),
-      setor_id: ticket.setor_id.toString(),
-      id_acesso: ticket.id_acesso || '',
-      anexo: ticket.anexo || '',
-      tipo_id: ticket.tipo_id?.toString() || '',
-      subtipo_id: ticket.subtipo_id?.toString() || ''
+      supervisor_id: String(ticket.supervisor_id),
+      posicao_operador: ticket.posicao_operador ?? '',
+      empresa_id: String(ticket.empresa_id),
+      setor_id: String(ticket.setor_id),
+      id_acesso: ticket.id_acesso ?? '',
+      anexo: ticket.anexo ?? '',
+      tipo_id: ticket.tipo_id ? String(ticket.tipo_id) : '',
+      subtipo_id: ticket.subtipo_id ? String(ticket.subtipo_id) : '',
     });
     setShowModal(true);
   };
 
-  const handleDelete = async (id: number) => {
-    if (confirm('Tem certeza que deseja excluir este chamado?')) {
-      try {
-        const { error } = await supabase
-          .from('chamados')
-          .delete()
-          .eq('id', id);
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingTicket(null);
+    setFormData(emptyForm());
+  };
 
-        if (error) throw error;
-        fetchTickets();
-      } catch (error) {
-        console.error('Erro ao excluir chamado:', error);
-        alert('Erro ao excluir chamado');
+  const setField = (field: keyof TicketFormData, value: string) =>
+    setFormData(prev => {
+      const next = { ...prev, [field]: value };
+      if (field === 'empresa_id') {
+        next.setor_id = '';
+        next.supervisor_id = '';
       }
+      if (field === 'tipo_id') next.subtipo_id = '';
+      return next;
+    });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (formData.anexo && !isSafeUrl(formData.anexo.trim())) {
+      toast.error('O anexo deve ser um link começando com http:// ou https://');
+      return;
+    }
+
+    const payload = {
+      problema: formData.problema.trim(),
+      supervisor_id: Number(formData.supervisor_id),
+      posicao_operador: formData.posicao_operador.trim() || null,
+      empresa_id: Number(formData.empresa_id),
+      setor_id: Number(formData.setor_id),
+      id_acesso: formData.id_acesso.trim() || null,
+      anexo: formData.anexo.trim() || null,
+      tipo_id: formData.tipo_id ? Number(formData.tipo_id) : null,
+      subtipo_id: formData.subtipo_id ? Number(formData.subtipo_id) : null,
+    };
+
+    setSaving(true);
+    const ok = editingTicket
+      ? await updateTicket(editingTicket.id, payload)
+      : await addTicket({ ...payload, status: 'aberto' });
+    setSaving(false);
+
+    if (ok) closeModal();
+  };
+
+  const handleStatusChange = (ticket: Ticket, status: TicketStatus) => {
+    if (status !== ticket.status) updateTicket(ticket.id, { status });
+  };
+
+  const handleDelete = (id: number) => {
+    if (window.confirm('Tem certeza que deseja excluir este chamado?')) {
+      deleteTicket(id);
     }
   };
 
-  const filteredTickets = tickets.filter(ticket => {
-    const matchesSearch = ticket.problema.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ticket.supervisor?.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ticket.empresa?.nome.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === '' || ticket.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'aberto': return 'bg-red-100 text-red-800';
-      case 'em_andamento': return 'bg-yellow-100 text-yellow-800';
-      case 'resolvido': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'aberto': return 'Aberto';
-      case 'em_andamento': return 'Em Andamento';
-      case 'resolvido': return 'Resolvido';
-      default: return status;
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
+  const canEdit = (ticket: Ticket) => !isSupervisor || (ticket.supervisor_id === user?.id && ticket.status === 'aberto');
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Chamados</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Chamados</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {visibleTickets.filter(t => t.status !== 'resolvido').length} chamado(s) pendente(s)
+          </p>
+        </div>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={openNew}
           className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
@@ -234,7 +213,7 @@ const Tickets: React.FC = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Buscar chamados..."
+                placeholder="Buscar por problema, número, supervisor, empresa ou setor..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -244,13 +223,13 @@ const Tickets: React.FC = () => {
           <div className="sm:w-48">
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              onChange={(e) => changeStatusFilter(e.target.value)}
+              className={inputClass}
             >
               <option value="">Todos os Status</option>
-              <option value="aberto">Aberto</option>
-              <option value="em_andamento">Em Andamento</option>
-              <option value="resolvido">Resolvido</option>
+              {(Object.keys(TICKET_STATUS_LABELS) as TicketStatus[]).map(status => (
+                <option key={status} value={status}>{TICKET_STATUS_LABELS[status]}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -262,93 +241,85 @@ const Tickets: React.FC = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Problema
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Supervisor
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Empresa/Setor
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Tipo
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Data
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ações
-                </th>
+                {['Chamado', 'Supervisor', 'Empresa/Setor', 'Tipo', 'Status', 'Data'].map(h => (
+                  <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
+                ))}
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredTickets.map((ticket) => (
-                <tr key={ticket.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {ticket.problema}
+                <tr key={ticket.id} className="hover:bg-gray-50 align-top">
+                  <td className="px-6 py-4 max-w-sm">
+                    <div className="text-xs font-mono text-gray-400">#{String(ticket.id).padStart(4, '0')}</div>
+                    <div className="text-sm font-medium text-gray-900 whitespace-pre-wrap break-words">{ticket.problema}</div>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
+                      {ticket.posicao_operador && (
+                        <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{ticket.posicao_operador}</span>
+                      )}
+                      {ticket.id_acesso && (
+                        <span className="flex items-center gap-1"><KeyRound className="w-3 h-3" />{ticket.id_acesso}</span>
+                      )}
+                      {ticket.anexo && isSafeUrl(ticket.anexo) && (
+                        <a href={ticket.anexo} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-indigo-600 hover:underline">
+                          <Paperclip className="w-3 h-3" />Anexo
+                        </a>
+                      )}
                     </div>
-                    {ticket.posicao_operador && (
-                      <div className="text-sm text-gray-500 flex items-center gap-1">
-                        <MapPin className="w-3 h-3" />
-                        {ticket.posicao_operador}
-                      </div>
-                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 flex items-center gap-1">
                       <User className="w-3 h-3" />
-                      {ticket.supervisor?.nome}
+                      {nameOf(users, ticket.supervisor_id) || '-'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 flex items-center gap-1">
                       <Building className="w-3 h-3" />
-                      {ticket.empresa?.nome}
+                      {nameOf(companies, ticket.empresa_id) || '-'}
                     </div>
-                    <div className="text-sm text-gray-500">
-                      {ticket.setor?.nome}
-                    </div>
+                    <div className="text-sm text-gray-500">{nameOf(sectors, ticket.setor_id)}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {ticket.tipo?.nome}
-                    </div>
-                    {ticket.subtipo?.nome && (
-                      <div className="text-sm text-gray-500">
-                        {ticket.subtipo.nome}
-                      </div>
+                    <div className="text-sm text-gray-900">{nameOf(ticketTypes, ticket.tipo_id) || '-'}</div>
+                    <div className="text-sm text-gray-500">{nameOf(ticketSubtypes, ticket.subtipo_id)}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {isSupervisor ? (
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${STATUS_COLORS[ticket.status]}`}>
+                        {TICKET_STATUS_LABELS[ticket.status]}
+                      </span>
+                    ) : (
+                      <select
+                        value={ticket.status}
+                        onChange={(e) => handleStatusChange(ticket, e.target.value as TicketStatus)}
+                        className={`text-xs font-semibold rounded-full px-2 py-1 border-0 cursor-pointer focus:ring-2 focus:ring-indigo-500 ${STATUS_COLORS[ticket.status]}`}
+                        aria-label="Alterar status"
+                      >
+                        {(Object.keys(TICKET_STATUS_LABELS) as TicketStatus[]).map(status => (
+                          <option key={status} value={status}>{TICKET_STATUS_LABELS[status]}</option>
+                        ))}
+                      </select>
                     )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(ticket.status)}`}>
-                      {getStatusText(ticket.status)}
-                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      {new Date(ticket.criado_em).toLocaleDateString('pt-BR')}
+                      {new Date(ticket.criado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handleEdit(ticket)}
-                        className="text-indigo-600 hover:text-indigo-900"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(ticket.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {canEdit(ticket) && (
+                        <button onClick={() => handleEdit(ticket)} className="text-indigo-600 hover:text-indigo-900" title="Editar">
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      )}
+                      {isAdmin && (
+                        <button onClick={() => handleDelete(ticket.id)} className="text-red-600 hover:text-red-900" title="Excluir">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -359,6 +330,7 @@ const Tickets: React.FC = () => {
 
         {filteredTickets.length === 0 && (
           <div className="text-center py-12">
+            <TicketIcon className="w-12 h-12 mx-auto text-gray-300 mb-2" />
             <div className="text-gray-500">Nenhum chamado encontrado</div>
           </div>
         )}
@@ -369,19 +341,18 @@ const Tickets: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-              <h2 className="text-xl font-bold mb-4">
-                {editingTicket ? 'Editar Chamado' : 'Novo Chamado'}
-              </h2>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">{editingTicket ? `Editar Chamado #${editingTicket.id}` : 'Novo Chamado'}</h2>
+                <button onClick={closeModal} className="text-gray-400 hover:text-gray-500"><X className="w-6 h-6" /></button>
+              </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Problema *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Problema *</label>
                   <textarea
                     value={formData.problema}
-                    onChange={(e) => setFormData({ ...formData, problema: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    onChange={(e) => setField('problema', e.target.value)}
+                    className={inputClass}
                     rows={3}
                     required
                   />
@@ -389,117 +360,96 @@ const Tickets: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Supervisor *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Empresa *</label>
+                    <select
+                      value={formData.empresa_id}
+                      onChange={(e) => setField('empresa_id', e.target.value)}
+                      className={inputClass}
+                      disabled={isSupervisor}
+                      required
+                    >
+                      <option value="">Selecione uma empresa</option>
+                      {companies.map(empresa => (
+                        <option key={empresa.id} value={empresa.id}>{empresa.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Setor *</label>
+                    <select
+                      value={formData.setor_id}
+                      onChange={(e) => setField('setor_id', e.target.value)}
+                      className={inputClass}
+                      disabled={!formData.empresa_id}
+                      required
+                    >
+                      <option value="">Selecione um setor</option>
+                      {sectors
+                        .filter(setor => setor.empresa_id === Number(formData.empresa_id))
+                        .map(setor => (
+                          <option key={setor.id} value={setor.id}>{setor.nome}</option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Supervisor *</label>
                     <select
                       value={formData.supervisor_id}
-                      onChange={(e) => setFormData({ ...formData, supervisor_id: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      onChange={(e) => setField('supervisor_id', e.target.value)}
+                      className={inputClass}
+                      disabled={isSupervisor}
                       required
                     >
                       <option value="">Selecione um supervisor</option>
-                      {usuarios.filter(u => u.funcao === 'supervisor').map((supervisor) => (
-                        <option key={supervisor.id} value={supervisor.id}>
-                          {supervisor.nome}
-                        </option>
+                      {(isSupervisor && user ? [user] : supervisorOptions).map(supervisor => (
+                        <option key={supervisor.id} value={supervisor.id}>{supervisor.nome}</option>
                       ))}
                     </select>
+                    {!isSupervisor && formData.empresa_id && supervisorOptions.length === 0 && (
+                      <p className="text-xs text-amber-600 mt-1">Nenhum supervisor cadastrado para esta empresa.</p>
+                    )}
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Posição do Operador
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Posição do Operador</label>
                     <input
                       type="text"
                       value={formData.posicao_operador}
-                      onChange={(e) => setFormData({ ...formData, posicao_operador: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      onChange={(e) => setField('posicao_operador', e.target.value)}
+                      className={inputClass}
+                      placeholder="Ex.: PA 12"
                     />
                   </div>
                 </div>
 
-                {user?.funcao !== 'supervisor' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Empresa *
-                      </label>
-                      <select
-                        value={formData.empresa_id}
-                        onChange={(e) => setFormData({ ...formData, empresa_id: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Selecione uma empresa</option>
-                        {empresas.map((empresa) => (
-                          <option key={empresa.id} value={empresa.id}>
-                            {empresa.nome}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Setor *
-                      </label>
-                      <select
-                        value={formData.setor_id}
-                        onChange={(e) => setFormData({ ...formData, setor_id: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Selecione um setor</option>
-                        {setores
-                          .filter(setor => !formData.empresa_id || setor.empresa_id.toString() === formData.empresa_id)
-                          .map((setor) => (
-                            <option key={setor.id} value={setor.id}>
-                              {setor.nome}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tipo do Chamado
-                    </label>
-                    <select
-                      value={formData.tipo_id}
-                      onChange={(e) => setFormData({ ...formData, tipo_id: e.target.value, subtipo_id: '' })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    >
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tipo do Chamado</label>
+                    <select value={formData.tipo_id} onChange={(e) => setField('tipo_id', e.target.value)} className={inputClass}>
                       <option value="">Selecione um tipo</option>
-                      {tipos.map((tipo) => (
-                        <option key={tipo.id} value={tipo.id}>
-                          {tipo.nome}
-                        </option>
+                      {ticketTypes.map(tipo => (
+                        <option key={tipo.id} value={tipo.id}>{tipo.nome}</option>
                       ))}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Subtipo do Chamado
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Subtipo do Chamado</label>
                     <select
                       value={formData.subtipo_id}
-                      onChange={(e) => setFormData({ ...formData, subtipo_id: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      onChange={(e) => setField('subtipo_id', e.target.value)}
+                      className={inputClass}
                       disabled={!formData.tipo_id}
                     >
                       <option value="">Selecione um subtipo</option>
-                      {subtipos
-                        .filter(subtipo => subtipo.tipo_id.toString() === formData.tipo_id)
-                        .map((subtipo) => (
-                          <option key={subtipo.id} value={subtipo.id}>
-                            {subtipo.nome}
-                          </option>
+                      {ticketSubtypes
+                        .filter(subtipo => subtipo.tipo_id === Number(formData.tipo_id))
+                        .map(subtipo => (
+                          <option key={subtipo.id} value={subtipo.id}>{subtipo.nome}</option>
                         ))}
                     </select>
                   </div>
@@ -507,58 +457,37 @@ const Tickets: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      ID de Acesso
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">ID de Acesso (AnyDesk, etc.)</label>
                     <input
                       type="text"
                       value={formData.id_acesso}
-                      onChange={(e) => setFormData({ ...formData, id_acesso: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      onChange={(e) => setField('id_acesso', e.target.value)}
+                      className={inputClass}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Anexo
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Anexo</label>
                     <input
-                      type="text"
+                      type="url"
                       value={formData.anexo}
-                      onChange={(e) => setFormData({ ...formData, anexo: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      placeholder="URL do anexo"
+                      onChange={(e) => setField('anexo', e.target.value)}
+                      className={inputClass}
+                      placeholder="https://link-do-anexo"
                     />
                   </div>
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowModal(false);
-                      setEditingTicket(null);
-                      setFormData({
-                        problema: '',
-                        supervisor_id: '',
-                        posicao_operador: '',
-                        empresa_id: '',
-                        setor_id: '',
-                        id_acesso: '',
-                        anexo: '',
-                        tipo_id: '',
-                        subtipo_id: ''
-                      });
-                    }}
-                    className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
-                  >
+                  <button type="button" onClick={closeModal} className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                    disabled={saving}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                   >
-                    {editingTicket ? 'Atualizar' : 'Criar'} Chamado
+                    {saving ? 'Salvando...' : editingTicket ? 'Atualizar Chamado' : 'Criar Chamado'}
                   </button>
                 </div>
               </form>

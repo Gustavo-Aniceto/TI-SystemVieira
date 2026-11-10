@@ -10,9 +10,7 @@ import {
   FileText, 
   Users, 
   LogOut,
-  AlertTriangle,
   ClipboardList,
-  UserCheck,
   StickyNote,
   Ticket,
   Building2,
@@ -24,10 +22,11 @@ import {
   Key
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { ROLE_LABELS } from '../types';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
-  const { user, signOut, isAdmin, isIntern, isSupervisor } = useAuth();
-  const { getLowStockProducts } = useData();
+  const { user, logout, isAdmin, isSupervisor, isIntern } = useAuth();
+  const { getLowStockProducts, loading } = useData();
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -38,8 +37,11 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     tools: false
   });
   
-  // Check for low stock products on initial load
+  // Alerta de estoque baixo uma vez, após o carregamento inicial dos dados
+  const [stockAlertShown, setStockAlertShown] = useState(false);
   useEffect(() => {
+    if (loading || stockAlertShown) return;
+    setStockAlertShown(true);
     if (isAdmin) {
       const lowStockProducts = getLowStockProducts();
       if (lowStockProducts.length > 0) {
@@ -49,7 +51,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             <p>{lowStockProducts.length} produto(s) com estoque baixo</p>
             <button 
               className="text-blue-500 underline"
-              onClick={() => navigate('/products?filter=lowstock')}
+              onClick={() => { toast.dismiss(); navigate('/products?filter=lowstock'); }}
             >
               Ver detalhes
             </button>
@@ -58,11 +60,11 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         );
       }
     }
-  }, [getLowStockProducts, navigate, isAdmin]);
+  }, [loading, stockAlertShown, getLowStockProducts, navigate, isAdmin]);
 
   const handleLogout = () => {
-    signOut();
-    // Navigation will be handled by auth state change
+    logout();
+    navigate('/login', { replace: true });
   };
 
   const toggleDropdown = (section: string) => {
@@ -184,7 +186,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           <NavItem to="/tickets" icon={<Ticket size={20} />} label="Chamados" />
           
           {/* Estoque */}
-          {!isSupervisor && (
+          {!isSupervisor && !isIntern && (
             <DropdownSection 
               title="Estoque" 
               icon={<Archive size={20} />} 
@@ -196,23 +198,22 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           )}
           
           {/* Configurações */}
-          <DropdownSection 
-            title="Configurações" 
-            icon={<Settings size={20} />} 
-            sectionKey="configuracoes"
-          >
-            {isAdmin && (
-              <>
-                <SubNavItem to="/reports" icon={<FileText size={16} />} label="Relatórios" />
-                <SubNavItem to="/users" icon={<Users size={16} />} label="Usuários" />
-                <SubNavItem to="/companies" icon={<Building2 size={16} />} label="Empresas" />
-                <SubNavItem to="/sectors" icon={<Building2 size={16} />} label="Setores" />
-                <SubNavItem to="/ticket-types" icon={<Ticket size={16} />} label="Tipos de Chamado" />
-              </>
-            )}
-          </DropdownSection>
+          {isAdmin && (
+            <DropdownSection 
+              title="Configurações" 
+              icon={<Settings size={20} />} 
+              sectionKey="configuracoes"
+            >
+              <SubNavItem to="/reports" icon={<FileText size={16} />} label="Relatórios" />
+              <SubNavItem to="/users" icon={<Users size={16} />} label="Usuários" />
+              <SubNavItem to="/companies" icon={<Building2 size={16} />} label="Empresas" />
+              <SubNavItem to="/sectors" icon={<Building2 size={16} />} label="Setores" />
+              <SubNavItem to="/ticket-types" icon={<Ticket size={16} />} label="Tipos de Chamado" />
+            </DropdownSection>
+          )}
           
           {/* Tools */}
+          {!isSupervisor && (
           <DropdownSection 
             title="Ferramentas" 
             icon={<Wrench size={20} />} 
@@ -225,21 +226,13 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
               <SubNavItem to="/ticket-history" icon={<ClipboardList size={16} />} label="Histórico de Chamados" />
             )}
           </DropdownSection>
-          
-          {/* Intern Activities */}
-          {isIntern && (
-            <NavItem to="/intern-activities" icon={<ClipboardList size={20} />} label="Minhas Atividades" />
           )}
         </nav>
         
         <div className="pt-4 mt-auto border-t border-gray-200">
           <div className="px-4 py-2">
-            <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
-            <p className="text-xs text-gray-500">
-              {user?.role === 'admin' ? 'Administrador' : 
-               user?.role === 'intern' ? 'Estagiário' :
-               user?.role === 'supervisor' ? 'Supervisor' : 'Usuário'}
-            </p>
+            <p className="text-sm font-semibold text-gray-900">{user?.nome}</p>
+            <p className="text-xs text-gray-500">{user ? ROLE_LABELS[user.funcao] : ''}</p>
           </div>
           
           <button

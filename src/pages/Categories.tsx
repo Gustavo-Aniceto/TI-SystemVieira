@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useData } from '../contexts/DataContext';
 import { Layers, Plus, Edit, Trash2, X } from 'lucide-react';
+import type { Category } from '../types';
 
 interface CategoryFormData {
   name: string;
@@ -11,7 +12,7 @@ const Categories = () => {
   const { categories, addCategory, updateCategory, deleteCategory, loading } = useData();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
-  const [currentCategory, setCurrentCategory] = useState<string | null>(null);
+  const [currentCategory, setCurrentCategory] = useState<number | null>(null);
   const [formData, setFormData] = useState<CategoryFormData>({
     name: '',
     description: ''
@@ -39,12 +40,12 @@ const Categories = () => {
     setIsModalOpen(true);
   };
   
-  const openEditModal = (category: any) => {
+  const openEditModal = (category: Category) => {
     setFormData({
       name: category.nome,
       description: category.descricao || ''
     });
-    setCurrentCategory(category.id.toString());
+    setCurrentCategory(category.id);
     setModalMode('edit');
     setIsModalOpen(true);
   };
@@ -59,27 +60,23 @@ const Categories = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (modalMode === 'add') {
-      addCategory({
-        nome: formData.name,
-        descricao: formData.description
-      });
-    } else if (modalMode === 'edit' && currentCategory) {
-      updateCategory(parseInt(currentCategory), {
-        nome: formData.name,
-        descricao: formData.description
-      });
-    }
-    
-    closeModal();
+    const payload = {
+      nome: formData.name.trim(),
+      descricao: formData.description.trim() || null,
+    };
+
+    const ok = modalMode === 'add'
+      ? await addCategory(payload)
+      : currentCategory !== null && await updateCategory(currentCategory, payload);
+
+    if (ok) closeModal();
   };
   
-  const handleDelete = (id: string) => {
+  const handleDelete = (id: number) => {
     if (window.confirm('Tem certeza que deseja excluir esta categoria?')) {
-      deleteCategory(parseInt(id));
+      deleteCategory(id);
     }
   };
 
@@ -156,7 +153,7 @@ const Categories = () => {
                         <Edit className="w-5 h-5" />
                       </button>
                       <button
-                        onClick={() => handleDelete(category.id.toString())}
+                        onClick={() => handleDelete(category.id)}
                         className="text-red-600 hover:text-red-900"
                       >
                         <Trash2 className="w-5 h-5" />

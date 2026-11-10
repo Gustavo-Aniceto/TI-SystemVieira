@@ -1,17 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
+import React, { useState } from 'react';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths, startOfDay, endOfDay } from 'date-fns';
+import toast from 'react-hot-toast';
+import type { CalendarEvent, EventType, Ticket } from '../types';
 import { ptBR } from 'date-fns/locale';
 import { useData } from '../contexts/DataContext';
 import { CalendarIcon, ChevronLeft, ChevronRight, Plus, Edit, Trash2, X, Filter } from 'lucide-react';
 
 interface CalendarFormData {
-  title: string;
-  description: string;
-  startDate: string;
-  endDate: string;
-  type: 'subscription' | 'task' | 'reminder';
-  color?: string;
+  titulo: string;
+  descricao: string;
+  data_inicio: string;
+  data_termino: string;
+  tipo: EventType;
+  cor: string;
 }
+
+const DEFAULT_COLOR = '#3b82f6';
+
+/** O evento ocupa (ao menos parte de) o dia informado? */
+const eventOnDay = (event: CalendarEvent, day: Date) =>
+  new Date(event.data_inicio) <= endOfDay(day) && new Date(event.data_termino) >= startOfDay(day);
 
 const Calendar = () => {
   const { events, tickets, addEvent, updateEvent, deleteEvent, sectors, ticketTypes } = useData();
@@ -19,85 +27,87 @@ const Calendar = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
-  const [currentEvent, setCurrentEvent] = useState<string | null>(null);
+  const [currentEvent, setCurrentEvent] = useState<number | null>(null);
   const [showTickets, setShowTickets] = useState(true);
   const [filterType, setFilterType] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [filterSector, setFilterSector] = useState<string>('');
-  const [formData, setFormData] = useState<CalendarFormData>({
-    title: '',
-    description: '',
-    startDate: format(new Date(), 'yyyy-MM-dd'),
-    endDate: format(new Date(), 'yyyy-MM-dd'),
-    type: 'task',
-    color: '#3b82f6' // Default blue
+  const emptyForm = (date: Date): CalendarFormData => ({
+    titulo: '',
+    descricao: '',
+    data_inicio: format(date, 'yyyy-MM-dd'),
+    data_termino: format(date, 'yyyy-MM-dd'),
+    tipo: 'tarefa',
+    cor: DEFAULT_COLOR,
   });
-  
+  const [formData, setFormData] = useState<CalendarFormData>(() => emptyForm(new Date()));
+
   const resetForm = () => {
-    setFormData({
-      title: '',
-      description: '',
-      startDate: format(selectedDate, 'yyyy-MM-dd'),
-      endDate: format(selectedDate, 'yyyy-MM-dd'),
-      type: 'task',
-      color: '#3b82f6'
-    });
+    setFormData(emptyForm(selectedDate));
     setCurrentEvent(null);
   };
-  
+
   const openAddModal = (date: Date = selectedDate) => {
-    resetForm();
-    setFormData(prev => ({
-      ...prev,
-      startDate: format(date, 'yyyy-MM-dd'),
-      endDate: format(date, 'yyyy-MM-dd')
-    }));
+    setFormData(emptyForm(date));
+    setCurrentEvent(null);
     setModalMode('add');
     setIsModalOpen(true);
   };
-  
-  const openEditModal = (event: any) => {
+
+  const openEditModal = (event: CalendarEvent) => {
     setFormData({
-      title: event.title,
-      description: event.description,
-      startDate: format(new Date(event.startDate), 'yyyy-MM-dd'),
-      endDate: format(new Date(event.endDate), 'yyyy-MM-dd'),
-      type: event.type,
-      color: event.color || '#3b82f6'
+      titulo: event.titulo,
+      descricao: event.descricao ?? '',
+      data_inicio: format(new Date(event.data_inicio), 'yyyy-MM-dd'),
+      data_termino: format(new Date(event.data_termino), 'yyyy-MM-dd'),
+      tipo: event.tipo,
+      cor: event.cor || DEFAULT_COLOR,
     });
     setCurrentEvent(event.id);
     setModalMode('edit');
     setIsModalOpen(true);
   };
-  
+
   const closeModal = () => {
     setIsModalOpen(false);
     resetForm();
   };
-  
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
-  
-  const handleSubmit = (e: React.FormEvent) => {
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (modalMode === 'add') {
-      addEvent(formData);
-    } else if (modalMode === 'edit' && currentEvent) {
-      updateEvent(currentEvent, formData);
+    if (formData.data_termino < formData.data_inicio) {
+      toast.error('A data de término deve ser igual ou posterior à data de início.');
+      return;
     }
-    
-    closeModal();
+
+    // Datas do formulário são dias inteiros no fuso local
+    const payload = {
+      titulo: formData.titulo.trim(),
+      descricao: formData.descricao.trim() || null,
+      tipo: formData.tipo,
+      cor: formData.cor,
+      data_inicio: new Date(`${formData.data_inicio}T00:00:00`).toISOString(),
+      data_termino: new Date(`${formData.data_termino}T23:59:59`).toISOString(),
+    };
+
+    const ok = modalMode === 'add'
+      ? await addEvent(payload)
+      : currentEvent !== null && await updateEvent(currentEvent, payload);
+
+    if (ok) closeModal();
   };
-  
-  const handleDelete = (id: string) => {
+
+  const handleDelete = (id: number) => {
     if (window.confirm('Tem certeza que deseja excluir este evento?')) {
       deleteEvent(id);
     }
   };
-  
+
   const nextMonth = () => {
     setCurrentDate(addMonths(currentDate, 1));
   };
@@ -164,16 +174,11 @@ const Calendar = () => {
         const formattedDate = format(day, 'yyyy-MM-dd');
         
         // Get events for the day
-        let eventsForDay = events.filter((event) => {
-          const eventStart = new Date(event.startDate);
-          const eventEnd = new Date(event.endDate);
-          const currentDay = new Date(day);
-          
-          return currentDay >= eventStart && currentDay <= eventEnd;
-        });
+        const cellDay = day;
+        const eventsForDay = events.filter((event) => eventOnDay(event, cellDay));
         
         // Get tickets for the day (if enabled)
-        let ticketsForDay: any[] = [];
+        let ticketsForDay: Ticket[] = [];
         if (showTickets) {
           ticketsForDay = tickets.filter((ticket) => {
             const ticketDate = new Date(ticket.criado_em);
@@ -270,17 +275,10 @@ const Calendar = () => {
   
   const renderEvents = () => {
     // Get events for the selected date
-    let selectedDateEvents = events.filter((event) => {
-      const eventStart = new Date(event.data_inicio);
-      const eventEnd = new Date(event.data_termino);
-      
-      return (
-        selectedDate >= eventStart && selectedDate <= eventEnd
-      );
-    });
+    const selectedDateEvents = events.filter((event) => eventOnDay(event, selectedDate));
     
     // Get tickets for the selected date
-    let selectedDateTickets: any[] = [];
+    let selectedDateTickets: Ticket[] = [];
     if (showTickets) {
       selectedDateTickets = tickets.filter((ticket) => {
         const ticketDate = new Date(ticket.criado_em);
@@ -349,7 +347,7 @@ const Calendar = () => {
                     <CalendarIcon className="w-3.5 h-3.5 mr-1" />
                     <span>
                       {format(new Date(event.data_inicio), 'dd/MM/yyyy')}
-                      {event.data_inicio !== event.data_termino && 
+                      {!isSameDay(new Date(event.data_inicio), new Date(event.data_termino)) && 
                         ` - ${format(new Date(event.data_termino), 'dd/MM/yyyy')}`}
                     </span>
                   </div>
@@ -540,14 +538,14 @@ const Calendar = () => {
             <form onSubmit={handleSubmit}>
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="titulo" className="block text-sm font-medium text-gray-700 mb-1">
                     Título *
                   </label>
                   <input
                     type="text"
-                    id="title"
-                    name="title"
-                    value={formData.title}
+                    id="titulo"
+                    name="titulo"
+                    value={formData.titulo}
                     onChange={handleChange}
                     required
                     className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -555,13 +553,13 @@ const Calendar = () => {
                 </div>
                 
                 <div>
-                  <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="descricao" className="block text-sm font-medium text-gray-700 mb-1">
                     Descrição
                   </label>
                   <textarea
-                    id="description"
-                    name="description"
-                    value={formData.description}
+                    id="descricao"
+                    name="descricao"
+                    value={formData.descricao}
                     onChange={handleChange}
                     rows={3}
                     className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -569,33 +567,33 @@ const Calendar = () => {
                 </div>
                 
                 <div>
-                  <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="tipo" className="block text-sm font-medium text-gray-700 mb-1">
                     Tipo *
                   </label>
                   <select
-                    id="type"
-                    name="type"
-                    value={formData.type}
+                    id="tipo"
+                    name="tipo"
+                    value={formData.tipo}
                     onChange={handleChange}
                     required
                     className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
-                    <option value="subscription">Assinatura</option>
-                    <option value="task">Tarefa</option>
-                    <option value="reminder">Lembrete</option>
+                    <option value="assinatura">Assinatura</option>
+                    <option value="tarefa">Tarefa</option>
+                    <option value="lembrete">Lembrete</option>
                   </select>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="data_inicio" className="block text-sm font-medium text-gray-700 mb-1">
                       Data de Início *
                     </label>
                     <input
                       type="date"
-                      id="startDate"
-                      name="startDate"
-                      value={formData.startDate}
+                      id="data_inicio"
+                      name="data_inicio"
+                      value={formData.data_inicio}
                       onChange={handleChange}
                       required
                       className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -603,40 +601,40 @@ const Calendar = () => {
                   </div>
                   
                   <div>
-                    <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="data_termino" className="block text-sm font-medium text-gray-700 mb-1">
                       Data de Término *
                     </label>
                     <input
                       type="date"
-                      id="endDate"
-                      name="endDate"
-                      value={formData.endDate}
+                      id="data_termino"
+                      name="data_termino"
+                      value={formData.data_termino}
                       onChange={handleChange}
                       required
-                      min={formData.startDate}
+                      min={formData.data_inicio}
                       className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                   </div>
                 </div>
                 
                 <div>
-                  <label htmlFor="color" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="cor" className="block text-sm font-medium text-gray-700 mb-1">
                     Cor
                   </label>
                   <div className="flex items-center">
                     <input
                       type="color"
-                      id="color"
-                      name="color"
-                      value={formData.color}
+                      id="cor"
+                      name="cor"
+                      value={formData.cor}
                       onChange={handleChange}
                       className="w-10 h-10 rounded-md border border-gray-300 p-1 mr-2"
                     />
                     <input
                       type="text"
-                      value={formData.color}
+                      value={formData.cor}
                       onChange={handleChange}
-                      name="color"
+                      name="cor"
                       className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                   </div>

@@ -1,49 +1,66 @@
 import React, { useState } from 'react';
 import { useData }  from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
-import { StickyNote, Plus, Edit, Trash2, X, Eye, EyeOff, CheckSquare, Square, ListChecks } from 'lucide-react';
+import { StickyNote, Plus, Edit, Trash2, X, Eye, EyeOff, CheckSquare, Square } from 'lucide-react';
+import toast from 'react-hot-toast';
+import type { Note } from '../types';
+
+interface ChecklistEntry {
+  text: string;
+  completed: boolean;
+}
 
 interface NoteFormData {
   title: string;
   content: string;
   type: 'note' | 'checklist';
-  color?: string;
+  color: string;
   isPublic: boolean;
-  checklistItems?: { text: string; completed: boolean; }[];
+  checklistItems: ChecklistEntry[];
 }
 
+// Listas de tarefas são guardadas em `conteudo` como linhas "[ ] item" / "[x] item"
+const CHECKLIST_LINE = /^\[( |x)\] (.*)$/;
+
+const parseChecklist = (content: string): ChecklistEntry[] | null => {
+  const lines = content.split('\n').filter(line => line.trim() !== '');
+  if (lines.length === 0 || !lines.every(line => CHECKLIST_LINE.test(line))) return null;
+  return lines.map(line => {
+    const [, mark, text] = line.match(CHECKLIST_LINE)!;
+    return { text, completed: mark === 'x' };
+  });
+};
+
+const serializeChecklist = (items: ChecklistEntry[]) =>
+  items.map(item => `[${item.completed ? 'x' : ' '}] ${item.text}`).join('\n');
+
+const emptyForm = (): NoteFormData => ({
+  title: '',
+  content: '',
+  type: 'note',
+  color: '#ffffff',
+  isPublic: false,
+  checklistItems: [],
+});
+
 const Notes = () => {
-  const { notes, addNote, updateNote, deleteNote } = useData();
+  const { notes, users, addNote, updateNote, deleteNote } = useData();
   const { user, isAdmin } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
-  const [currentNote, setCurrentNote] = useState<string | null>(null);
+  const [currentNote, setCurrentNote] = useState<number | null>(null);
   const [showOnlyMine, setShowOnlyMine] = useState(!isAdmin);
-  const [formData, setFormData] = useState<NoteFormData>({
-    title: '',
-    content: '',
-    type: 'note',
-    color: '#ffffff',
-    isPublic: false,
-    checklistItems: []
-  });
+  const [formData, setFormData] = useState<NoteFormData>(emptyForm);
   const [newChecklistItem, setNewChecklistItem] = useState('');
 
-  // Filter notes based on visibility and ownership
+  // Usuários veem as próprias anotações e as públicas; admin pode ver todas
   const filteredNotes = notes.filter(note => {
     if (isAdmin && !showOnlyMine) return true;
-    return note.userId === user?.id || note.isPublic;
+    return note.criado_por === user?.id || note.tornar_publico;
   });
 
   const resetForm = () => {
-    setFormData({
-      title: '',
-      content: '',
-      type: 'note',
-      color: '#ffffff',
-      isPublic: false,
-      checklistItems: []
-    });
+    setFormData(emptyForm());
     setNewChecklistItem('');
     setCurrentNote(null);
   };
@@ -54,14 +71,15 @@ const Notes = () => {
     setIsModalOpen(true);
   };
 
-  const openEditModal = (note: any) => {
+  const openEditModal = (note: Note) => {
+    const checklist = parseChecklist(note.conteudo);
     setFormData({
-      title: note.title,
-      content: note.content,
-      type: note.type,
-      color: note.color || '#ffffff',
-      isPublic: note.isPublic,
-      checklistItems: note.checklistItems || []
+      title: note.titulo,
+      content: checklist ? '' : note.conteudo,
+      type: checklist ? 'checklist' : 'note',
+      color: note.cor_fundo || '#ffffff',
+      isPublic: note.tornar_publico,
+      checklistItems: checklist ?? [],
     });
     setCurrentNote(note.id);
     setModalMode('edit');
@@ -74,24 +92,17 @@ const Notes = () => {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    if (type === 'checkbox') {
-      const checkbox = e.target as HTMLInputElement;
-      setFormData(prev => ({ ...prev, [name]: checkbox.checked }));
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
-    }
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleAddChecklistItem = () => {
-    if (!newChecklistItem.trim()) return;
+    const text = newChecklistItem.replace(/\s+/g, ' ').trim();
+    if (!text) return;
 
     setFormData(prev => ({
       ...prev,
-      checklistItems: [
-        ...(prev.checklistItems || []),
-        { text: newChecklistItem, completed: false }
-      ]
+      checklistItems: [...prev.checklistItems, { text, completed: false }],
     }));
     setNewChecklistItem('');
   };
@@ -99,35 +110,50 @@ const Notes = () => {
   const handleRemoveChecklistItem = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      checklistItems: prev.checklistItems?.filter((_, i) => i !== index)
+      checklistItems: prev.checklistItems.filter((_, i) => i !== index),
     }));
   };
 
   const toggleChecklistItem = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      checklistItems: prev.checklistItems?.map((item, i) => 
+      checklistItems: prev.checklistItems.map((item, i) =>
         i === index ? { ...item, completed: !item.completed } : item
-      )
+      ),
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (modalMode === 'add') {
-      addNote({
-        ...formData,
-        userId: user!.id
-      });
-    } else if (modalMode === 'edit' && currentNote) {
-      updateNote(currentNote, formData);
-    }
-    
-    closeModal();
+  // Marca/desmarca um item direto no card, salvando no banco
+  const toggleNoteItem = (note: Note, index: number) => {
+    const items = parseChecklist(note.conteudo);
+    if (!items) return;
+    items[index] = { ...items[index], completed: !items[index].completed };
+    updateNote(note.id, { conteudo: serializeChecklist(items) });
   };
 
-  const handleDelete = (id: string) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (formData.type === 'checklist' && formData.checklistItems.length === 0) {
+      toast.error('Adicione ao menos um item à lista.');
+      return;
+    }
+
+    const payload = {
+      titulo: formData.title.trim(),
+      conteudo: formData.type === 'checklist' ? serializeChecklist(formData.checklistItems) : formData.content,
+      cor_fundo: formData.color,
+      tornar_publico: formData.isPublic,
+    };
+
+    const ok = modalMode === 'add'
+      ? await addNote({ ...payload, criado_por: user?.id ?? null })
+      : currentNote !== null && await updateNote(currentNote, payload);
+
+    if (ok) closeModal();
+  };
+
+  const handleDelete = (id: number) => {
     if (window.confirm('Tem certeza que deseja excluir esta anotação?')) {
       deleteNote(id);
     }
@@ -182,17 +208,21 @@ const Notes = () => {
             </div>
           </div>
         ) : (
-          filteredNotes.map(note => (
+          filteredNotes.map(note => {
+            const checklist = parseChecklist(note.conteudo);
+            const isOwner = note.criado_por === user?.id;
+            const author = !isOwner ? users.find(u => u.id === note.criado_por)?.nome : undefined;
+            return (
             <div
               key={note.id}
               className="group relative bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-lg transform hover:scale-[1.02]"
-              style={{ backgroundColor: note.color }}
+              style={{ backgroundColor: note.cor_fundo || '#ffffff' }}
             >
               <div className="p-4">
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-lg font-medium text-gray-900">{note.title}</h3>
+                  <h3 className="text-lg font-medium text-gray-900">{note.titulo}</h3>
                   <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {note.userId === user?.id && (
+                    {(isOwner || isAdmin) && (
                       <>
                         <button
                           onClick={() => openEditModal(note)}
@@ -211,16 +241,16 @@ const Notes = () => {
                   </div>
                 </div>
 
-                {note.type === 'note' ? (
-                  <p className="text-sm text-gray-600 whitespace-pre-wrap">{note.content}</p>
+                {!checklist ? (
+                  <p className="text-sm text-gray-600 whitespace-pre-wrap">{note.conteudo}</p>
                 ) : (
                   <div className="space-y-2">
-                    {note.checklistItems?.map((item, index) => (
+                    {checklist.map((item, index) => (
                       <div key={index} className="flex items-center">
                         <button
-                          onClick={() => toggleChecklistItem(index)}
-                          className="text-gray-500 hover:text-blue-600"
-                          disabled={note.userId !== user?.id}
+                          onClick={() => toggleNoteItem(note, index)}
+                          className="text-gray-500 hover:text-blue-600 disabled:cursor-default disabled:hover:text-gray-500"
+                          disabled={!isOwner}
                         >
                           {item.completed ? (
                             <CheckSquare className="w-4 h-4" />
@@ -238,27 +268,28 @@ const Notes = () => {
 
                 <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
                   <div className="flex items-center">
-                    {note.isPublic ? (
+                    {note.tornar_publico ? (
                       <Eye className="w-3 h-3 mr-1" />
                     ) : (
                       <EyeOff className="w-3 h-3 mr-1" />
                     )}
-                    <span>{note.isPublic ? 'Pública' : 'Privada'}</span>
+                    <span>{note.tornar_publico ? 'Pública' : 'Privada'}{author ? ` · ${author}` : ''}</span>
                   </div>
                   <span>
-                    {new Date(note.updatedAt).toLocaleDateString('pt-BR')}
+                    {new Date(note.criado_em).toLocaleDateString('pt-BR')}
                   </span>
                 </div>
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
 
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-gray-900">
                 {modalMode === 'add' ? 'Nova Anotação' : 'Editar Anotação'}
@@ -323,7 +354,7 @@ const Notes = () => {
                       Itens da Lista
                     </label>
                     <div className="space-y-2">
-                      {formData.checklistItems?.map((item, index) => (
+                      {formData.checklistItems.map((item, index) => (
                         <div key={index} className="flex items-center">
                           <button
                             type="button"
@@ -353,7 +384,7 @@ const Notes = () => {
                           onChange={(e) => setNewChecklistItem(e.target.value)}
                           placeholder="Novo item"
                           className="flex-1 rounded-md border border-gray-300 py-1 px-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          onKeyPress={(e) => {
+                          onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                               e.preventDefault();
                               handleAddChecklistItem();

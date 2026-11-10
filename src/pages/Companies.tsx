@@ -1,89 +1,61 @@
 import React, { useState } from 'react';
 import { useData } from '../contexts/DataContext';
 import { Building2, Plus, Edit, Trash2, X } from 'lucide-react';
+import type { Company } from '../types';
 
 interface CompanyFormData {
-  name: string;
-  description: string;
-  departments: string[];
+  nome: string;
+  descricao: string;
 }
 
 const Companies = () => {
-  const { companies, addCompany, updateCompany, deleteCompany } = useData();
+  const { companies, sectors, addCompany, updateCompany, deleteCompany } = useData();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
-  const [currentCompany, setCurrentCompany] = useState<string | null>(null);
-  const [formData, setFormData] = useState<CompanyFormData>({
-    name: '',
-    description: '',
-    departments: []
-  });
-  const [newDepartment, setNewDepartment] = useState('');
-  
+  const [currentCompany, setCurrentCompany] = useState<number | null>(null);
+  const [formData, setFormData] = useState<CompanyFormData>({ nome: '', descricao: '' });
+
   const resetForm = () => {
-    setFormData({ name: '', description: '', departments: [] });
-    setNewDepartment('');
+    setFormData({ nome: '', descricao: '' });
     setCurrentCompany(null);
   };
-  
+
   const openAddModal = () => {
     resetForm();
     setModalMode('add');
     setIsModalOpen(true);
   };
-  
-  const openEditModal = (company: any) => {
-    setFormData({
-      name: company.name,
-      description: company.description || '',
-      departments: company.departments || []
-    });
+
+  const openEditModal = (company: Company) => {
+    setFormData({ nome: company.nome, descricao: company.descricao ?? '' });
     setCurrentCompany(company.id);
     setModalMode('edit');
     setIsModalOpen(true);
   };
-  
+
   const closeModal = () => {
     setIsModalOpen(false);
     resetForm();
   };
-  
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const addDepartment = () => {
-    if (newDepartment.trim() && !formData.departments.includes(newDepartment.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        departments: [...prev.departments, newDepartment.trim()]
-      }));
-      setNewDepartment('');
-    }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const payload = { nome: formData.nome.trim(), descricao: formData.descricao.trim() || null };
+
+    const ok = modalMode === 'add'
+      ? await addCompany(payload)
+      : currentCompany !== null && await updateCompany(currentCompany, payload);
+
+    if (ok) closeModal();
   };
 
-  const removeDepartment = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      departments: prev.departments.filter((_, i) => i !== index)
-    }));
-  };
-  
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (modalMode === 'add') {
-      addCompany(formData);
-    } else if (modalMode === 'edit' && currentCompany) {
-      updateCompany(currentCompany, formData);
-    }
-    
-    closeModal();
-  };
-  
-  const handleDelete = (id: string) => {
-    if (window.confirm('Tem certeza que deseja excluir esta empresa?')) {
+  const handleDelete = (id: number) => {
+    if (window.confirm('Tem certeza que deseja excluir esta empresa? Os setores vinculados também serão excluídos.')) {
       deleteCompany(id);
     }
   };
@@ -132,6 +104,9 @@ const Companies = () => {
                     Descrição
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Setores
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Data de Criação
                   </th>
                   <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -143,14 +118,17 @@ const Companies = () => {
                 {companies.map((company) => (
                   <tr key={company.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{company.name}</div>
+                      <div className="text-sm font-medium text-gray-900">{company.nome}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm text-gray-500">{company.description || '-'}</div>
+                      <div className="text-sm text-gray-500">{company.descricao || '-'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">{sectors.filter(s => s.empresa_id === company.id).length}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-500">
-                        {new Date(company.createdAt).toLocaleDateString('pt-BR')}
+                        {new Date(company.criado_em).toLocaleDateString('pt-BR')}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -197,8 +175,8 @@ const Companies = () => {
                   <input
                     type="text"
                     id="name"
-                    name="name"
-                    value={formData.name}
+                    name="nome"
+                    value={formData.nome}
                     onChange={handleChange}
                     required
                     className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -211,8 +189,8 @@ const Companies = () => {
                   </label>
                   <textarea
                     id="description"
-                    name="description"
-                    value={formData.description}
+                    name="descricao"
+                    value={formData.descricao}
                     onChange={handleChange}
                     rows={3}
                     className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"

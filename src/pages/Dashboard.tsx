@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
+import { EVENT_TYPE_LABELS } from '../types';
 import { 
   Monitor, 
   Package, 
@@ -11,7 +12,6 @@ import {
   Ticket,
   CheckCircle,
   Clock,
-  XCircle,
   TrendingUp,
   Users,
   Building2
@@ -21,39 +21,31 @@ const Dashboard = () => {
   const { products, categories, events, tickets, users, companies, getLowStockProducts, loading } = useData();
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
-  const [lowStockProducts, setLowStockProducts] = useState<typeof products>([]);
-  const [upcomingEvents, setUpcomingEvents] = useState<typeof events>([]);
-  const [ticketStats, setTicketStats] = useState({
-    open: 0,
-    inProgress: 0,
-    resolved: 0,
-    closed: 0
-  });
-  
-  useEffect(() => {
-    // Get low stock products
-    setLowStockProducts(getLowStockProducts());
-    
-    // Get upcoming events (next 7 days)
+
+  const lowStockProducts = useMemo(() => getLowStockProducts(), [getLowStockProducts]);
+
+  // Eventos que acontecem nos próximos 7 dias (inclui os que já estão em andamento)
+  const upcomingEvents = useMemo(() => {
     const now = new Date();
     const nextWeek = new Date();
     nextWeek.setDate(now.getDate() + 7);
-    
-    const upcoming = events.filter(event => {
-      const eventDate = new Date(event.startDate);
-      return eventDate >= now && eventDate <= nextWeek;
-    });
-    
-    setUpcomingEvents(upcoming);
+    return events
+      .filter(event => new Date(event.data_termino) >= now && new Date(event.data_inicio) <= nextWeek)
+      .sort((a, b) => a.data_inicio.localeCompare(b.data_inicio));
+  }, [events]);
 
-    // Calculate ticket statistics
-    const stats = tickets.reduce((acc, ticket) => {
-      acc[ticket.status.replace('-', '') as keyof typeof acc]++;
-      return acc;
-    }, { open: 0, inProgress: 0, resolved: 0, closed: 0 });
-    
-    setTicketStats(stats);
-  }, [products, events, tickets, getLowStockProducts]);
+  const ticketStats = useMemo(() => ({
+    open: tickets.filter(t => t.status === 'aberto').length,
+    inProgress: tickets.filter(t => t.status === 'em_andamento').length,
+    resolved: tickets.filter(t => t.status === 'resolvido').length,
+    total: tickets.length,
+  }), [tickets]);
+
+  const countByCategory = (...keywords: string[]) =>
+    products.filter(p => {
+      const name = categories.find(c => c.id === p.categoria_id)?.nome.toLowerCase() ?? '';
+      return keywords.some(k => name.includes(k));
+    }).length;
 
   if (loading) {
     return (
@@ -111,7 +103,7 @@ const Dashboard = () => {
       <header>
         <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
         <p className="mt-2 text-gray-600">
-          Bem-vindo, {user?.name}! Aqui está um resumo do seu sistema.
+          Bem-vindo, {user?.nome}! Aqui está um resumo do seu sistema.
         </p>
       </header>
       
@@ -119,10 +111,7 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
         <MetricCard
           title="Computadores"
-          value={products.filter(p => {
-            const category = categories.find(c => c.id === p.categoria_id);
-            return category?.name.toLowerCase().includes('hardware') || category?.name.toLowerCase().includes('computador');
-          }).length}
+          value={countByCategory('hardware', 'computador')}
           icon={<Monitor className="h-8 w-8" />}
           bgColor="bg-gradient-to-br from-red-400 to-red-500"
           link="/products"
@@ -130,10 +119,7 @@ const Dashboard = () => {
         
         <MetricCard
           title="Software"
-          value={products.filter(p => {
-            const category = categories.find(c => c.id === p.categoryId);
-            return category?.name.toLowerCase().includes('software');
-          }).length}
+          value={countByCategory('software')}
           icon={<Package className="h-8 w-8" />}
           bgColor="bg-gradient-to-br from-green-400 to-green-500"
           link="/products"
@@ -141,10 +127,7 @@ const Dashboard = () => {
         
         <MetricCard
           title="Dispositivos de Rede"
-          value={products.filter(p => {
-            const category = categories.find(c => c.id === p.categoria_id);
-            return category?.name.toLowerCase().includes('rede');
-          }).length}
+          value={countByCategory('rede')}
           icon={<Layers className="h-8 w-8" />}
           bgColor="bg-gradient-to-br from-blue-400 to-blue-500"
           link="/products"
@@ -174,7 +157,7 @@ const Dashboard = () => {
           value={ticketStats.open}
           icon={<Ticket className="h-8 w-8" />}
           bgColor="bg-gradient-to-br from-red-500 to-red-600"
-          link="/tickets?status=open"
+          link="/tickets?status=aberto"
         />
         
         <MetricCard
@@ -182,7 +165,7 @@ const Dashboard = () => {
           value={ticketStats.inProgress}
           icon={<Clock className="h-8 w-8" />}
           bgColor="bg-gradient-to-br from-yellow-500 to-yellow-600"
-          link="/tickets?status=in-progress"
+          link="/tickets?status=em_andamento"
         />
         
         <MetricCard
@@ -190,7 +173,7 @@ const Dashboard = () => {
           value={ticketStats.resolved}
           icon={<CheckCircle className="h-8 w-8" />}
           bgColor="bg-gradient-to-br from-blue-500 to-blue-600"
-          link="/tickets?status=resolved"
+          link="/tickets?status=resolvido"
         />
         
         <MetricCard
@@ -198,7 +181,7 @@ const Dashboard = () => {
           value={users.length}
           icon={<Users className="h-8 w-8" />}
           bgColor="bg-gradient-to-br from-purple-500 to-purple-600"
-          link="/users"
+          link={isAdmin ? "/users" : undefined}
         />
         
         <MetricCard
@@ -206,7 +189,7 @@ const Dashboard = () => {
           value={companies.length}
           icon={<Building2 className="h-8 w-8" />}
           bgColor="bg-gradient-to-br from-indigo-500 to-indigo-600"
-          link="/companies"
+          link={isAdmin ? "/companies" : undefined}
         />
       </div>
       
@@ -291,25 +274,21 @@ const Dashboard = () => {
                 {upcomingEvents.slice(0, 5).map((event) => (
                   <div key={event.id} className="flex items-center p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 hover:border-blue-300 transition-all duration-200">
                     <div className="flex-1">
-                      <h4 className="text-sm font-semibold text-gray-900">{event.title}</h4>
-                      <p className="text-xs text-gray-500">{event.description}</p>
+                      <h4 className="text-sm font-semibold text-gray-900">{event.titulo}</h4>
+                      <p className="text-xs text-gray-500">{event.descricao}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-bold text-blue-700">
-                        {new Date(event.startDate).toLocaleDateString('pt-BR')}
+                        {new Date(event.data_inicio).toLocaleDateString('pt-BR')}
                       </p>
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        event.type === 'subscription'
+                        event.tipo === 'assinatura'
                           ? 'bg-blue-100 text-blue-800'
-                          : event.type === 'task'
+                          : event.tipo === 'tarefa'
                           ? 'bg-green-100 text-green-800'
                           : 'bg-purple-100 text-purple-800'
                       }`}>
-                        {event.type === 'subscription'
-                          ? 'Assinatura'
-                          : event.type === 'task'
-                          ? 'Tarefa'
-                          : 'Lembrete'}
+                        {EVENT_TYPE_LABELS[event.tipo] ?? event.tipo}
                       </span>
                     </div>
                   </div>
@@ -342,21 +321,21 @@ const Dashboard = () => {
         </div>
         <div className="p-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-lg hover:shadow-md transition-all duration-200 cursor-pointer" onClick={() => navigate('/tickets?status=open')}>
+            <div className="text-center p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-lg hover:shadow-md transition-all duration-200 cursor-pointer" onClick={() => navigate('/tickets?status=aberto')}>
               <div className="text-3xl font-bold text-red-600 mb-1">{ticketStats.open}</div>
               <div className="text-sm font-medium text-red-700">Abertos</div>
             </div>
-            <div className="text-center p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg hover:shadow-md transition-all duration-200 cursor-pointer" onClick={() => navigate('/tickets?status=in-progress')}>
+            <div className="text-center p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg hover:shadow-md transition-all duration-200 cursor-pointer" onClick={() => navigate('/tickets?status=em_andamento')}>
               <div className="text-3xl font-bold text-yellow-600 mb-1">{ticketStats.inProgress}</div>
               <div className="text-sm font-medium text-yellow-700">Em Andamento</div>
             </div>
-            <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg hover:shadow-md transition-all duration-200 cursor-pointer" onClick={() => navigate('/tickets?status=resolved')}>
+            <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg hover:shadow-md transition-all duration-200 cursor-pointer" onClick={() => navigate('/tickets?status=resolvido')}>
               <div className="text-3xl font-bold text-blue-600 mb-1">{ticketStats.resolved}</div>
               <div className="text-sm font-medium text-blue-700">Resolvidos</div>
             </div>
-            <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg hover:shadow-md transition-all duration-200 cursor-pointer" onClick={() => navigate('/tickets?status=closed')}>
-              <div className="text-3xl font-bold text-green-600 mb-1">{ticketStats.closed}</div>
-              <div className="text-sm font-medium text-green-700">Fechados</div>
+            <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg hover:shadow-md transition-all duration-200 cursor-pointer" onClick={() => navigate('/tickets')}>
+              <div className="text-3xl font-bold text-green-600 mb-1">{ticketStats.total}</div>
+              <div className="text-sm font-medium text-green-700">Total</div>
             </div>
           </div>
         </div>

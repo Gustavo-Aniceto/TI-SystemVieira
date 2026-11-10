@@ -3,57 +3,52 @@ import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Key, Plus, Edit, Trash2, X, Eye, EyeOff, Copy, RefreshCw, Search, Filter, Shield, Globe, User, CreditCard, Briefcase, Heart } from 'lucide-react';
 import toast from 'react-hot-toast';
+import type { PasswordEntry } from '../types';
+
+type PasswordCategory = 'work' | 'personal' | 'social' | 'financial' | 'other';
 
 interface PasswordFormData {
   title: string;
   username: string;
   password: string;
-  website?: string;
-  notes?: string;
-  category: 'work' | 'personal' | 'social' | 'financial' | 'other';
+  notes: string;
+  category: PasswordCategory;
 }
+
+const emptyForm = (): PasswordFormData => ({
+  title: '',
+  username: '',
+  password: '',
+  notes: '',
+  category: 'personal',
+});
 
 const PasswordManager = () => {
   const { passwords, addPassword, updatePassword, deletePassword } = useData();
   const { user } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
-  const [currentPassword, setCurrentPassword] = useState<string | null>(null);
-  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+  const [currentPassword, setCurrentPassword] = useState<number | null>(null);
+  const [showPasswords, setShowPasswords] = useState<Record<number, boolean>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('');
-  const [formData, setFormData] = useState<PasswordFormData>({
-    title: '',
-    username: '',
-    password: '',
-    website: '',
-    notes: '',
-    category: 'personal'
-  });
+  const [formData, setFormData] = useState<PasswordFormData>(emptyForm);
 
-  // Filter passwords for current user
-  const userPasswords = passwords.filter(password => password.userId === user?.id);
+  // Cada usuário vê apenas as próprias senhas
+  const userPasswords = passwords.filter(password => password.criado_por === user?.id);
 
-  // Apply search and category filters
+  const term = searchTerm.toLowerCase();
   const filteredPasswords = userPasswords.filter(password => {
-    const matchesSearch = password.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         password.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (password.website && password.website.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesCategory = !filterCategory || password.category === filterCategory;
-    
+    const matchesSearch =
+      password.sistema.toLowerCase().includes(term) ||
+      password.usuario_acesso.toLowerCase().includes(term) ||
+      (password.observacoes ?? '').toLowerCase().includes(term);
+    const matchesCategory = !filterCategory || (password.categoria || 'other') === filterCategory;
     return matchesSearch && matchesCategory;
   });
 
   const resetForm = () => {
-    setFormData({
-      title: '',
-      username: '',
-      password: '',
-      website: '',
-      notes: '',
-      category: 'personal'
-    });
+    setFormData(emptyForm());
     setCurrentPassword(null);
   };
 
@@ -63,14 +58,13 @@ const PasswordManager = () => {
     setIsModalOpen(true);
   };
 
-  const openEditModal = (password: any) => {
+  const openEditModal = (password: PasswordEntry) => {
     setFormData({
-      title: password.title,
-      username: password.username,
-      password: password.password,
-      website: password.website || '',
-      notes: password.notes || '',
-      category: password.category
+      title: password.sistema,
+      username: password.usuario_acesso,
+      password: password.senha_criptografada,
+      notes: password.observacoes ?? '',
+      category: (password.categoria as PasswordCategory) || 'other',
     });
     setCurrentPassword(password.id);
     setModalMode('edit');
@@ -87,6 +81,13 @@ const PasswordManager = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Índice aleatório criptograficamente seguro
+  const randomIndex = (max: number) => {
+    const buffer = new Uint32Array(1);
+    crypto.getRandomValues(buffer);
+    return buffer[0] % max;
+  };
+
   const generatePassword = (length: number = 16, includeSymbols: boolean = true) => {
     const lowercase = 'abcdefghijklmnopqrstuvwxyz';
     const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -101,20 +102,26 @@ const PasswordManager = () => {
     let password = '';
     
     // Ensure at least one character from each type
-    password += lowercase[Math.floor(Math.random() * lowercase.length)];
-    password += uppercase[Math.floor(Math.random() * uppercase.length)];
-    password += numbers[Math.floor(Math.random() * numbers.length)];
+    password += lowercase[randomIndex(lowercase.length)];
+    password += uppercase[randomIndex(uppercase.length)];
+    password += numbers[randomIndex(numbers.length)];
     if (includeSymbols) {
-      password += symbols[Math.floor(Math.random() * symbols.length)];
+      password += symbols[randomIndex(symbols.length)];
     }
     
     // Fill the rest randomly
     for (let i = password.length; i < length; i++) {
-      password += charset[Math.floor(Math.random() * charset.length)];
+      password += charset[randomIndex(charset.length)];
     }
     
     // Shuffle the password
-    return password.split('').sort(() => Math.random() - 0.5).join('');
+    // Embaralha (Fisher-Yates)
+    const chars = password.split('');
+    for (let i = chars.length - 1; i > 0; i--) {
+      const j = randomIndex(i + 1);
+      [chars[i], chars[j]] = [chars[j], chars[i]];
+    }
+    return chars.join('');
   };
 
   const handleGeneratePassword = () => {
@@ -122,28 +129,30 @@ const PasswordManager = () => {
     setFormData(prev => ({ ...prev, password: newPassword }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (modalMode === 'add') {
-      addPassword({
-        ...formData,
-        userId: user!.id
-      });
-    } else if (modalMode === 'edit' && currentPassword) {
-      updatePassword(currentPassword, formData);
-    }
-    
-    closeModal();
+    const payload = {
+      sistema: formData.title.trim(),
+      usuario_acesso: formData.username.trim(),
+      senha_criptografada: formData.password,
+      categoria: formData.category,
+      observacoes: formData.notes.trim() || null,
+    };
+
+    const ok = modalMode === 'add'
+      ? await addPassword({ ...payload, criado_por: user?.id ?? null })
+      : currentPassword !== null && await updatePassword(currentPassword, payload);
+
+    if (ok) closeModal();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (id: number) => {
     if (window.confirm('Tem certeza que deseja excluir esta senha?')) {
       deletePassword(id);
     }
   };
 
-  const togglePasswordVisibility = (id: string) => {
+  const togglePasswordVisibility = (id: number) => {
     setShowPasswords(prev => ({
       ...prev,
       [id]: !prev[id]
@@ -154,7 +163,7 @@ const PasswordManager = () => {
     try {
       await navigator.clipboard.writeText(text);
       toast.success(`${type} copiado para a área de transferência!`);
-    } catch (err) {
+    } catch {
       toast.error('Erro ao copiar para a área de transferência');
     }
   };
@@ -325,7 +334,8 @@ const PasswordManager = () => {
           </div>
         ) : (
           filteredPasswords.map(password => {
-            const strength = getPasswordStrength(password.password);
+            const strength = getPasswordStrength(password.senha_criptografada);
+            const category = password.categoria || 'other';
             const isVisible = showPasswords[password.id];
             
             return (
@@ -335,13 +345,13 @@ const PasswordManager = () => {
               >
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center">
-                    <div className={`p-2 rounded-lg ${getCategoryColor(password.category)} mr-3`}>
-                      {getCategoryIcon(password.category)}
+                    <div className={`p-2 rounded-lg ${getCategoryColor(category)} mr-3`}>
+                      {getCategoryIcon(category)}
                     </div>
                     <div>
-                      <h3 className="text-lg font-medium text-gray-900">{password.title}</h3>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(password.category)}`}>
-                        {getCategoryLabel(password.category)}
+                      <h3 className="text-lg font-medium text-gray-900">{password.sistema}</h3>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(category)}`}>
+                        {getCategoryLabel(category)}
                       </span>
                     </div>
                   </div>
@@ -363,29 +373,13 @@ const PasswordManager = () => {
                 </div>
 
                 <div className="space-y-3">
-                  {/* Website */}
-                  {password.website && (
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Site</label>
-                      <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                        <span className="text-sm text-gray-700 truncate">{password.website}</span>
-                        <button
-                          onClick={() => copyToClipboard(password.website!, 'Site')}
-                          className="text-gray-500 hover:text-gray-700 ml-2"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Username */}
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">Usuário</label>
                     <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                      <span className="text-sm text-gray-700 truncate">{password.username}</span>
+                      <span className="text-sm text-gray-700 truncate">{password.usuario_acesso}</span>
                       <button
-                        onClick={() => copyToClipboard(password.username, 'Usuário')}
+                        onClick={() => copyToClipboard(password.usuario_acesso, 'Usuário')}
                         className="text-gray-500 hover:text-gray-700 ml-2"
                       >
                         <Copy className="w-4 h-4" />
@@ -398,7 +392,7 @@ const PasswordManager = () => {
                     <label className="block text-xs font-medium text-gray-500 mb-1">Senha</label>
                     <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
                       <span className="text-sm text-gray-700 font-mono">
-                        {isVisible ? password.password : '••••••••••••'}
+                        {isVisible ? password.senha_criptografada : '••••••••••••'}
                       </span>
                       <div className="flex space-x-1 ml-2">
                         <button
@@ -408,7 +402,7 @@ const PasswordManager = () => {
                           {isVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                         <button
-                          onClick={() => copyToClipboard(password.password, 'Senha')}
+                          onClick={() => copyToClipboard(password.senha_criptografada, 'Senha')}
                           className="text-gray-500 hover:text-gray-700"
                         >
                           <Copy className="w-4 h-4" />
@@ -426,18 +420,17 @@ const PasswordManager = () => {
                   </div>
 
                   {/* Notes */}
-                  {password.notes && (
+                  {password.observacoes && (
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Notas</label>
-                      <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded">{password.notes}</p>
+                      <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded whitespace-pre-wrap">{password.observacoes}</p>
                     </div>
                   )}
 
                   {/* Timestamps */}
                   <div className="pt-3 border-t border-gray-200">
                     <div className="flex justify-between text-xs text-gray-500">
-                      <span>Criado: {new Date(password.createdAt).toLocaleDateString('pt-BR')}</span>
-                      <span>Atualizado: {new Date(password.updatedAt).toLocaleDateString('pt-BR')}</span>
+                      <span>Criado em {new Date(password.criado_em).toLocaleDateString('pt-BR')}</span>
                     </div>
                   </div>
                 </div>
@@ -497,21 +490,6 @@ const PasswordManager = () => {
                     <option value="financial">Financeiro</option>
                     <option value="other">Outros</option>
                   </select>
-                </div>
-
-                <div>
-                  <label htmlFor="website" className="block text-sm font-medium text-gray-700 mb-1">
-                    Site/URL
-                  </label>
-                  <input
-                    type="url"
-                    id="website"
-                    name="website"
-                    value={formData.website}
-                    onChange={handleChange}
-                    placeholder="https://exemplo.com"
-                    className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
                 </div>
 
                 <div>

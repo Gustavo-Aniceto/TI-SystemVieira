@@ -1,207 +1,179 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { useAuth } from './AuthContext';
-import { generateExcel } from '../utils/excelUtils';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { supabase, USER_COLUMNS } from '../lib/supabase';
+import { useAuth } from './AuthContext';
+import { generateExcel, formatDate, formatDateTime, ExcelRow } from '../utils/excelUtils';
+import {
+  Category,
+  Product,
+  CalendarEvent,
+  User,
+  Company,
+  Sector,
+  Ticket,
+  TicketType,
+  TicketSubtype,
+  Note,
+  PasswordEntry,
+  NewRecord,
+  ReportFilters,
+  PRODUCT_STATUS_LABELS,
+  EVENT_TYPE_LABELS,
+  TICKET_STATUS_LABELS,
+  ROLE_LABELS,
+} from '../types';
 
-// Interfaces baseadas no schema do banco
-interface Category {
-  id: number;
-  nome: string;
-  descricao?: string;
-  criado_em: string;
-}
+/** Usuário como retornado pela API (sem a coluna senha). */
+export type AppUser = Omit<User, 'senha'>;
 
-interface Product {
-  id: number;
-  nome: string;
-  descricao?: string;
-  categoria_id: number;
-  status: 'ativo' | 'inativo' | 'em_manutencao';
-  quantidade: number;
-  quantidade_minima: number;
-  numero_serie?: string;
-  localizacao?: string;
-  data_compra?: string;
-  fim_garantia?: string;
-  notas?: string;
-  criado_em: string;
-}
+export type ReportType = 'products' | 'categories' | 'events' | 'tickets' | 'users';
 
-interface CalendarEvent {
-  id: number;
-  titulo: string;
-  descricao?: string;
-  tipo: 'assinatura' | 'tarefa' | 'lembrete';
-  data_inicio: string;
-  data_termino: string;
-  cor?: string;
-  criado_em: string;
-}
-
-interface User {
-  id: number;
-  nome: string;
-  nome_usuario: string;
-  email: string;
-  senha: string;
-  funcao: 'usuario' | 'administrador' | 'supervisor' | 'estagiario';
-  empresa_id: number;
-  setor_id?: number;
-  criado_em: string;
-}
-
-interface Company {
-  id: number;
-  nome: string;
-  descricao?: string;
-  criado_em: string;
-}
-
-interface Sector {
-  id: number;
-  nome: string;
-  empresa_id: number;
-  criado_em: string;
-}
-
-interface TicketType {
-  id: number;
-  nome: string;
-}
-
-interface TicketSubtype {
-  id: number;
-  tipo_id: number;
-  nome: string;
-}
-
-interface Ticket {
-  id: number;
-  problema: string;
-  supervisor_id: number;
-  posicao_operador?: string;
-  empresa_id: number;
-  setor_id: number;
-  id_acesso?: string;
-  anexo?: string;
-  status: 'aberto' | 'em_andamento' | 'resolvido';
-  criado_em: string;
-  tipo_id?: number;
-  subtipo_id?: number;
-}
-
-interface Note {
-  id: number;
-  titulo: string;
-  conteudo: string;
-  cor_fundo?: string;
-  tornar_publico: boolean;
-  criado_por?: number;
-  criado_em: string;
-}
-
-interface PasswordEntry {
-  id: number;
-  sistema: string;
-  usuario_acesso: string;
-  senha_criptografada: string;
-  categoria?: string;
-  observacoes?: string;
-  criado_por?: number;
-  criado_em: string;
-}
+type Add<T> = (data: NewRecord<T>) => Promise<boolean>;
+type AddNoMeta<T> = (data: Omit<T, 'id'>) => Promise<boolean>;
+type Update<T> = (id: number, data: Partial<T>) => Promise<boolean>;
+type Remove = (id: number) => Promise<boolean>;
 
 interface DataContextType {
-  // Loading states
   loading: boolean;
-  
-  // Categories
-  categories: Category[];
-  addCategory: (category: Omit<Category, 'id' | 'criado_em'>) => Promise<void>;
-  updateCategory: (id: number, category: Partial<Category>) => Promise<void>;
-  deleteCategory: (id: number) => Promise<void>;
-  
-  // Products
-  products: Product[];
-  addProduct: (product: Omit<Product, 'id' | 'criado_em'>) => Promise<void>;
-  updateProduct: (id: number, product: Partial<Product>) => Promise<void>;
-  deleteProduct: (id: number) => Promise<void>;
-  getLowStockProducts: () => Product[];
-  adjustProductQuantity: (id: number, adjustment: number, reason?: string) => Promise<void>;
-  
-  // Calendar
-  events: CalendarEvent[];
-  addEvent: (event: Omit<CalendarEvent, 'id' | 'criado_em'>) => Promise<void>;
-  updateEvent: (id: number, event: Partial<CalendarEvent>) => Promise<void>;
-  deleteEvent: (id: number) => Promise<void>;
-  
-  // Users
-  users: User[];
-  addUser: (user: Omit<User, 'id' | 'criado_em'>) => Promise<void>;
-  updateUser: (id: number, user: Partial<User>) => Promise<void>;
-  deleteUser: (id: number) => Promise<void>;
-  
-  // Companies
-  companies: Company[];
-  addCompany: (company: Omit<Company, 'id' | 'criado_em'>) => Promise<void>;
-  updateCompany: (id: number, company: Partial<Company>) => Promise<void>;
-  deleteCompany: (id: number) => Promise<void>;
-  
-  // Sectors
-  sectors: Sector[];
-  addSector: (sector: Omit<Sector, 'id' | 'criado_em'>) => Promise<void>;
-  updateSector: (id: number, sector: Partial<Sector>) => Promise<void>;
-  deleteSector: (id: number) => Promise<void>;
-  
-  // Notes
-  notes: Note[];
-  addNote: (note: Omit<Note, 'id' | 'criado_em'>) => Promise<void>;
-  updateNote: (id: number, note: Partial<Note>) => Promise<void>;
-  deleteNote: (id: number) => Promise<void>;
-  
-  // Password Manager
-  passwords: PasswordEntry[];
-  addPassword: (password: Omit<PasswordEntry, 'id' | 'criado_em'>) => Promise<void>;
-  updatePassword: (id: number, password: Partial<PasswordEntry>) => Promise<void>;
-  deletePassword: (id: number) => Promise<void>;
-
-  // Tickets
-  tickets: Ticket[];
-  addTicket: (ticket: Omit<Ticket, 'id' | 'criado_em'>) => Promise<void>;
-  updateTicket: (id: number, ticket: Partial<Ticket>) => Promise<void>;
-  deleteTicket: (id: number) => Promise<void>;
-  
-  // Ticket Types
-  ticketTypes: TicketType[];
-  addTicketType: (type: Omit<TicketType, 'id'>) => Promise<void>;
-  updateTicketType: (id: number, type: Partial<TicketType>) => Promise<void>;
-  deleteTicketType: (id: number) => Promise<void>;
-  
-  // Ticket Subtypes
-  ticketSubtypes: TicketSubtype[];
-  addTicketSubtype: (subtype: Omit<TicketSubtype, 'id'>) => Promise<void>;
-  updateTicketSubtype: (id: number, subtype: Partial<TicketSubtype>) => Promise<void>;
-  deleteTicketSubtype: (id: number) => Promise<void>;
-  
-  // Reports
-  generateReport: (type: string, filters: any) => void;
-  
-  // Refresh data
   refreshData: () => Promise<void>;
+
+  categories: Category[];
+  addCategory: Add<Category>;
+  updateCategory: Update<Category>;
+  deleteCategory: Remove;
+
+  products: Product[];
+  addProduct: Add<Product>;
+  updateProduct: Update<Product>;
+  deleteProduct: Remove;
+  getLowStockProducts: () => Product[];
+  adjustProductQuantity: (id: number, adjustment: number, reason?: string) => Promise<boolean>;
+
+  events: CalendarEvent[];
+  addEvent: Add<CalendarEvent>;
+  updateEvent: Update<CalendarEvent>;
+  deleteEvent: Remove;
+
+  users: AppUser[];
+  addUser: Add<User>;
+  updateUser: Update<User>;
+  deleteUser: Remove;
+
+  companies: Company[];
+  addCompany: Add<Company>;
+  updateCompany: Update<Company>;
+  deleteCompany: Remove;
+
+  sectors: Sector[];
+  addSector: Add<Sector>;
+  updateSector: Update<Sector>;
+  deleteSector: Remove;
+
+  notes: Note[];
+  addNote: Add<Note>;
+  updateNote: Update<Note>;
+  deleteNote: Remove;
+
+  passwords: PasswordEntry[];
+  addPassword: Add<PasswordEntry>;
+  updatePassword: Update<PasswordEntry>;
+  deletePassword: Remove;
+
+  tickets: Ticket[];
+  addTicket: Add<Ticket>;
+  updateTicket: Update<Ticket>;
+  deleteTicket: Remove;
+
+  ticketTypes: TicketType[];
+  addTicketType: AddNoMeta<TicketType>;
+  updateTicketType: Update<TicketType>;
+  deleteTicketType: Remove;
+
+  ticketSubtypes: TicketSubtype[];
+  addTicketSubtype: AddNoMeta<TicketSubtype>;
+  updateTicketSubtype: Update<TicketSubtype>;
+  deleteTicketSubtype: Remove;
+
+  generateReport: (type: ReportType, filters?: ReportFilters, rows?: ExcelRow[]) => void;
 }
 
 const DataContext = createContext<DataContextType>({} as DataContextType);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useData = () => useContext(DataContext);
 
+type Setter<T> = React.Dispatch<React.SetStateAction<T[]>>;
+type WithId = { id: number };
+
+const describeError = (error: unknown): string => {
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code?: string }).code;
+    if (code === '23505') return 'Já existe um registro com esses dados.';
+    if (code === '23503') return 'O registro está em uso por outros dados.';
+  }
+  return '';
+};
+
+/**
+ * Cria funções de inserir/atualizar/excluir para uma tabela, mantendo o
+ * estado local sincronizado e exibindo notificações.
+ */
+function crud<T extends WithId, TInsert>(
+  table: string,
+  setState: Setter<T>,
+  label: { singular: string; feminine?: boolean },
+  columns = '*'
+) {
+  const done = label.feminine ? 'a' : 'o';
+  const fail = (action: string, error: unknown) => {
+    console.error(`Erro ao ${action} ${label.singular}:`, error);
+    const detail = describeError(error);
+    toast.error(`Erro ao ${action} ${label.singular}.${detail ? ' ' + detail : ''}`);
+    return false;
+  };
+
+  const add = async (payload: TInsert): Promise<boolean> => {
+    const { data, error } = await supabase.from(table).insert(payload).select(columns).single();
+    if (error) return fail('adicionar', error);
+    setState(prev => [...prev, data as unknown as T]);
+    toast.success(`${capitalize(label.singular)} adicionad${done} com sucesso!`);
+    return true;
+  };
+
+  const update = async (id: number, payload: Partial<T>): Promise<boolean> => {
+    const { data, error } = await supabase.from(table).update(payload).eq('id', id).select(columns).single();
+    if (error) return fail('atualizar', error);
+    setState(prev => prev.map(item => (item.id === id ? { ...item, ...(data as unknown as T) } : item)));
+    toast.success(`${capitalize(label.singular)} atualizad${done} com sucesso!`);
+    return true;
+  };
+
+  const remove = async (id: number): Promise<boolean> => {
+    const { error } = await supabase.from(table).delete().eq('id', id);
+    if (error) return fail('excluir', error);
+    setState(prev => prev.filter(item => item.id !== id));
+    toast.success(`${capitalize(label.singular)} excluíd${done} com sucesso!`);
+    return true;
+  };
+
+  return { add, update, remove };
+}
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** Remove a senha vazia de atualizações para não sobrescrevê-la. */
+const sanitizeUserUpdate = (data: Partial<User>): Partial<User> => {
+  const { senha, ...rest } = data;
+  return senha ? { ...rest, senha } : rest;
+};
+
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { session } = useAuth();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<AppUser[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [sectors, setSectors] = useState<Sector[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -210,929 +182,362 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [ticketTypes, setTicketTypes] = useState<TicketType[]>([]);
   const [ticketSubtypes, setTicketSubtypes] = useState<TicketSubtype[]>([]);
 
-  // Função para carregar todos os dados
-  const loadData = async () => {
-    if (!session) {
+  const userId = user?.id;
+
+  const loadData = useCallback(async () => {
+    if (!userId) {
       setLoading(false);
       return;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
-      
-      const [
-        categoriesData,
-        productsData,
-        eventsData,
-        usersData,
-        companiesData,
-        sectorsData,
-        ticketsData,
-        notesData,
-        passwordsData,
-        ticketTypesData,
-        ticketSubtypesData
-      ] = await Promise.all([
+      const results = await Promise.all([
         supabase.from('categorias').select('*').order('nome'),
         supabase.from('produtos').select('*').order('nome'),
         supabase.from('eventos_calendario').select('*').order('data_inicio'),
-        supabase.from('usuarios').select('*').order('nome'),
+        supabase.from('usuarios').select(USER_COLUMNS).order('nome'),
         supabase.from('empresas').select('*').order('nome'),
         supabase.from('setores').select('*').order('nome'),
         supabase.from('chamados').select('*').order('criado_em', { ascending: false }),
         supabase.from('anotacoes').select('*').order('criado_em', { ascending: false }),
-        supabase.from('senhas').select('*').order('sistema'),
-        supabase.from('chamados_tipos').select('*').order('nome'),
-        supabase.from('chamados_subtipos').select('*').order('nome')
+        supabase.from('senhas').select('*').eq('criado_por', userId).order('sistema'),
+        supabase.from('tipos_chamado').select('*').order('nome'),
+        supabase.from('subtipos_chamado').select('*').order('nome'),
       ]);
 
-      setCategories(categoriesData.data || []);
-      setProducts(productsData.data || []);
-      setEvents(eventsData.data || []);
-      setUsers(usersData.data || []);
-      setCompanies(companiesData.data || []);
-      setSectors(sectorsData.data || []);
-      setTickets(ticketsData.data || []);
-      setNotes(notesData.data || []);
-      setPasswords(passwordsData.data || []);
-      setTicketTypes(ticketTypesData.data || []);
-      setTicketSubtypes(ticketSubtypesData.data || []);
-      
+      const failed = results.filter(r => r.error);
+      if (failed.length > 0) {
+        failed.forEach(r => console.error('Erro ao carregar dados:', r.error));
+        toast.error('Alguns dados não puderam ser carregados.');
+      }
+
+      const [cat, prod, ev, usr, comp, sect, tick, nts, pwd, tt, ts] = results;
+      setCategories((cat.data as Category[]) || []);
+      setProducts((prod.data as Product[]) || []);
+      setEvents((ev.data as CalendarEvent[]) || []);
+      setUsers((usr.data as unknown as AppUser[]) || []);
+      setCompanies((comp.data as Company[]) || []);
+      setSectors((sect.data as Sector[]) || []);
+      setTickets((tick.data as Ticket[]) || []);
+      setNotes((nts.data as Note[]) || []);
+      setPasswords((pwd.data as PasswordEntry[]) || []);
+      setTicketTypes((tt.data as TicketType[]) || []);
+      setTicketSubtypes((ts.data as TicketSubtype[]) || []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast.error('Erro ao carregar dados do sistema');
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
-  // Carregar dados quando a sessão mudar
   useEffect(() => {
     loadData();
-  }, [session]);
+  }, [loadData]);
 
-  // Função para refresh manual dos dados
-  const refreshData = async () => {
-    await loadData();
-  };
+  // CRUD genérico ------------------------------------------------------------
+  const categoryOps = crud<Category, NewRecord<Category>>('categorias', setCategories, { singular: 'categoria', feminine: true });
+  const productOps = crud<Product, NewRecord<Product>>('produtos', setProducts, { singular: 'produto' });
+  const eventOps = crud<CalendarEvent, NewRecord<CalendarEvent>>('eventos_calendario', setEvents, { singular: 'evento' });
+  const userOps = crud<AppUser, NewRecord<User>>('usuarios', setUsers, { singular: 'usuário' }, USER_COLUMNS);
+  const companyOps = crud<Company, NewRecord<Company>>('empresas', setCompanies, { singular: 'empresa', feminine: true });
+  const sectorOps = crud<Sector, NewRecord<Sector>>('setores', setSectors, { singular: 'setor' });
+  const noteOps = crud<Note, NewRecord<Note>>('anotacoes', setNotes, { singular: 'anotação', feminine: true });
+  const passwordOps = crud<PasswordEntry, NewRecord<PasswordEntry>>('senhas', setPasswords, { singular: 'senha', feminine: true });
+  const ticketOps = crud<Ticket, NewRecord<Ticket>>('chamados', setTickets, { singular: 'chamado' });
+  const typeOps = crud<TicketType, Omit<TicketType, 'id'>>('tipos_chamado', setTicketTypes, { singular: 'tipo de chamado' });
+  const subtypeOps = crud<TicketSubtype, Omit<TicketSubtype, 'id'>>('subtipos_chamado', setTicketSubtypes, { singular: 'subtipo de chamado' });
 
-  // Category operations
-  const addCategory = async (categoryData: Omit<Category, 'id' | 'criado_em'>) => {
-    try {
-      const { data, error } = await supabase
-        .from('categorias')
-        .insert(categoryData)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setCategories(prev => [...prev, data]);
-      toast.success('Categoria adicionada com sucesso!');
-    } catch (error) {
-      console.error('Erro ao adicionar categoria:', error);
-      toast.error('Erro ao adicionar categoria');
+  const warnLowStock = (product?: Product) => {
+    if (product && product.quantidade <= product.quantidade_minima) {
+      toast(`Atenção: ${product.nome} está com estoque baixo!`, { icon: '⚠️' });
     }
   };
 
-  const updateCategory = async (id: number, categoryData: Partial<Category>) => {
-    try {
-      const { data, error } = await supabase
-        .from('categorias')
-        .update(categoryData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setCategories(prev => 
-        prev.map(cat => cat.id === id ? { ...cat, ...data } : cat)
-      );
-      toast.success('Categoria atualizada com sucesso!');
-    } catch (error) {
-      console.error('Erro ao atualizar categoria:', error);
-      toast.error('Erro ao atualizar categoria');
+  // Regras específicas -------------------------------------------------------
+  const deleteCategory: Remove = async id => {
+    if (products.some(p => p.categoria_id === id)) {
+      toast.error('Esta categoria não pode ser excluída porque está sendo usada por produtos.');
+      return false;
     }
+    return categoryOps.remove(id);
   };
 
-  const deleteCategory = async (id: number) => {
-    try {
-      // Verificar se categoria está em uso
-      const { data: productsUsingCategory } = await supabase
-        .from('produtos')
-        .select('id')
-        .eq('categoria_id', id)
-        .limit(1);
-
-      if (productsUsingCategory && productsUsingCategory.length > 0) {
-        toast.error('Esta categoria não pode ser excluída porque está sendo usada por produtos.');
-        return;
-      }
-
-      const { error } = await supabase
-        .from('categorias')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setCategories(prev => prev.filter(cat => cat.id !== id));
-      toast.success('Categoria excluída com sucesso!');
-    } catch (error) {
-      console.error('Erro ao excluir categoria:', error);
-      toast.error('Erro ao excluir categoria');
-    }
+  const addProduct: Add<Product> = async data => {
+    const ok = await productOps.add(data);
+    if (ok) warnLowStock(data as Product);
+    return ok;
   };
 
-  // Product operations
-  const addProduct = async (productData: Omit<Product, 'id' | 'criado_em'>) => {
-    try {
-      const { data, error } = await supabase
-        .from('produtos')
-        .insert(productData)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setProducts(prev => [...prev, data]);
-      toast.success('Produto adicionado com sucesso!');
-      
-      // Verificar estoque baixo
-      if (data.quantidade <= data.quantidade_minima) {
-        toast.error(`ALERTA: ${data.nome} está com estoque baixo!`);
-      }
-    } catch (error) {
-      console.error('Erro ao adicionar produto:', error);
-      toast.error('Erro ao adicionar produto');
+  const updateProduct: Update<Product> = async (id, data) => {
+    const ok = await productOps.update(id, data);
+    if (ok) {
+      const current = products.find(p => p.id === id);
+      warnLowStock(current ? { ...current, ...data } : undefined);
     }
-  };
-
-  const updateProduct = async (id: number, productData: Partial<Product>) => {
-    try {
-      const { data, error } = await supabase
-        .from('produtos')
-        .update(productData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setProducts(prev => 
-        prev.map(prod => prod.id === id ? { ...prod, ...data } : prod)
-      );
-      toast.success('Produto atualizado com sucesso!');
-      
-      // Verificar estoque baixo
-      if (data.quantidade <= data.quantidade_minima) {
-        toast.error(`ALERTA: ${data.nome} está com estoque baixo!`);
-      }
-    } catch (error) {
-      console.error('Erro ao atualizar produto:', error);
-      toast.error('Erro ao atualizar produto');
-    }
-  };
-
-  const deleteProduct = async (id: number) => {
-    try {
-      const { error } = await supabase
-        .from('produtos')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setProducts(prev => prev.filter(prod => prod.id !== id));
-      toast.success('Produto excluído com sucesso!');
-    } catch (error) {
-      console.error('Erro ao excluir produto:', error);
-      toast.error('Erro ao excluir produto');
-    }
+    return ok;
   };
 
   const adjustProductQuantity = async (id: number, adjustment: number, reason?: string) => {
-    try {
-      const product = products.find(p => p.id === id);
-      if (!product) {
-        toast.error('Produto não encontrado');
-        return;
-      }
+    const product = products.find(p => p.id === id);
+    if (!product) {
+      toast.error('Produto não encontrado');
+      return false;
+    }
 
-      const newQuantity = Math.max(0, product.quantidade + adjustment);
-      
-      const { data, error } = await supabase
-        .from('produtos')
-        .update({ quantidade: newQuantity })
-        .eq('id', id)
-        .select()
-        .single();
+    const newQuantity = Math.max(0, product.quantidade + adjustment);
+    const applied = newQuantity - product.quantidade;
+    if (applied === 0) {
+      toast.error('O estoque já está zerado.');
+      return false;
+    }
 
-      if (error) throw error;
-
-      setProducts(prev => 
-        prev.map(prod => prod.id === id ? { ...prod, quantidade: newQuantity } : prod)
-      );
-
-      // Registrar movimentação de estoque
-      await supabase.from('movimentacoes_estoque').insert({
-        produto_id: id,
-        tipo: adjustment > 0 ? 'entrada' : 'saida',
-        quantidade: Math.abs(adjustment),
-        observacao: reason || (adjustment > 0 ? 'Entrada manual' : 'Saída manual')
-      });
-
-      toast.success(`Quantidade ${adjustment > 0 ? 'adicionada' : 'removida'} com sucesso!`);
-      
-      // Verificar estoque baixo
-      if (newQuantity <= product.quantidade_minima) {
-        toast.error(`ALERTA: ${product.nome} está com estoque baixo!`);
-      }
-    } catch (error) {
+    const { error } = await supabase.from('produtos').update({ quantidade: newQuantity }).eq('id', id);
+    if (error) {
       console.error('Erro ao ajustar quantidade:', error);
       toast.error('Erro ao ajustar quantidade');
+      return false;
     }
+
+    setProducts(prev => prev.map(p => (p.id === id ? { ...p, quantidade: newQuantity } : p)));
+
+    const { error: movementError } = await supabase.from('movimentacoes_estoque').insert({
+      produto_id: id,
+      tipo: applied > 0 ? 'entrada' : 'saida',
+      quantidade: Math.abs(applied),
+      observacao: reason || (applied > 0 ? 'Entrada manual' : 'Saída manual'),
+      usuario_id: userId ?? null,
+    });
+    if (movementError) console.error('Erro ao registrar movimentação:', movementError);
+
+    toast.success(`${Math.abs(applied)} unidade(s) ${applied > 0 ? 'adicionada(s)' : 'removida(s)'}.`);
+    warnLowStock({ ...product, quantidade: newQuantity });
+    return true;
   };
 
-  const getLowStockProducts = () => {
-    return products.filter(product => product.quantidade <= product.quantidade_minima);
-  };
+  const getLowStockProducts = useCallback(
+    () => products.filter(p => p.quantidade <= p.quantidade_minima),
+    [products]
+  );
 
-  // Company operations
-  const addCompany = async (companyData: Omit<Company, 'id' | 'criado_em'>) => {
-    try {
-      const { data, error } = await supabase
-        .from('empresas')
-        .insert(companyData)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setCompanies(prev => [...prev, data]);
-      toast.success('Empresa adicionada com sucesso!');
-    } catch (error) {
-      console.error('Erro ao adicionar empresa:', error);
-      toast.error('Erro ao adicionar empresa');
+  const deleteCompany: Remove = async id => {
+    if (users.some(u => u.empresa_id === id)) {
+      toast.error('Esta empresa não pode ser excluída porque possui usuários vinculados.');
+      return false;
     }
-  };
-
-  const updateCompany = async (id: number, companyData: Partial<Company>) => {
-    try {
-      const { data, error } = await supabase
-        .from('empresas')
-        .update(companyData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setCompanies(prev => 
-        prev.map(comp => comp.id === id ? { ...comp, ...data } : comp)
-      );
-      toast.success('Empresa atualizada com sucesso!');
-    } catch (error) {
-      console.error('Erro ao atualizar empresa:', error);
-      toast.error('Erro ao atualizar empresa');
+    if (tickets.some(t => t.empresa_id === id)) {
+      toast.error('Esta empresa não pode ser excluída porque possui chamados vinculados.');
+      return false;
     }
+    const ok = await companyOps.remove(id);
+    if (ok) setSectors(prev => prev.filter(s => s.empresa_id !== id));
+    return ok;
   };
 
-  const deleteCompany = async (id: number) => {
-    try {
-      // Verificar se empresa está em uso
-      const { data: usersUsingCompany } = await supabase
-        .from('usuarios')
-        .select('id')
-        .eq('empresa_id', id)
-        .limit(1);
+  const deleteSector: Remove = async id => {
+    if (tickets.some(t => t.setor_id === id)) {
+      toast.error('Este setor não pode ser excluído porque possui chamados vinculados.');
+      return false;
+    }
+    return sectorOps.remove(id);
+  };
 
-      if (usersUsingCompany && usersUsingCompany.length > 0) {
-        toast.error('Esta empresa não pode ser excluída porque está sendo usada por usuários.');
-        return;
+  const updateUser: Update<User> = (id, data) => userOps.update(id, sanitizeUserUpdate(data) as Partial<AppUser>);
+
+  const deleteUser: Remove = async id => {
+    if (id === userId) {
+      toast.error('Você não pode excluir o próprio usuário.');
+      return false;
+    }
+    const target = users.find(u => u.id === id);
+    const admins = users.filter(u => u.funcao === 'administrador');
+    if (target?.funcao === 'administrador' && admins.length <= 1) {
+      toast.error('Não é possível excluir o último usuário administrador.');
+      return false;
+    }
+    if (tickets.some(t => t.supervisor_id === id)) {
+      toast.error('Este usuário possui chamados vinculados e não pode ser excluído.');
+      return false;
+    }
+    return userOps.remove(id);
+  };
+
+  const deleteTicketType: Remove = async id => {
+    const ok = await typeOps.remove(id);
+    if (ok) setTicketSubtypes(prev => prev.filter(s => s.tipo_id !== id));
+    return ok;
+  };
+
+  // Relatórios ---------------------------------------------------------------
+  const generateReport = (type: ReportType, filters: ReportFilters = {}, customRows?: ExcelRow[]) => {
+    const inRange = (date: string) => {
+      const d = new Date(date);
+      if (filters.startDate && d < new Date(`${filters.startDate}T00:00:00`)) return false;
+      if (filters.endDate && d > new Date(`${filters.endDate}T23:59:59`)) return false;
+      return true;
+    };
+
+    let rows: ExcelRow[] = customRows ?? [];
+
+    if (!customRows) {
+      switch (type) {
+        case 'products':
+          rows = products
+            .filter(p => !filters.categoryId || p.categoria_id === filters.categoryId)
+            .filter(p => !filters.status || p.status === filters.status)
+            .filter(p => !filters.lowStock || p.quantidade <= p.quantidade_minima)
+            .map(p => ({
+              ID: p.id,
+              Nome: p.nome,
+              Categoria: categories.find(c => c.id === p.categoria_id)?.nome ?? 'Sem categoria',
+              Quantidade: p.quantidade,
+              'Quantidade Mínima': p.quantidade_minima,
+              Status: PRODUCT_STATUS_LABELS[p.status] ?? p.status,
+              'Número de Série': p.numero_serie ?? '',
+              Localização: p.localizacao ?? '',
+              'Data de Compra': formatDate(p.data_compra),
+              'Fim da Garantia': formatDate(p.fim_garantia),
+              'Data de Criação': formatDate(p.criado_em),
+            }));
+          break;
+
+        case 'categories':
+          rows = categories.map(c => ({
+            ID: c.id,
+            Nome: c.nome,
+            Descrição: c.descricao ?? '',
+            Produtos: products.filter(p => p.categoria_id === c.id).length,
+            'Data de Criação': formatDate(c.criado_em),
+          }));
+          break;
+
+        case 'events':
+          rows = events
+            .filter(e => inRange(e.data_inicio))
+            .filter(e => !filters.type || e.tipo === filters.type)
+            .map(e => ({
+              ID: e.id,
+              Título: e.titulo,
+              Tipo: EVENT_TYPE_LABELS[e.tipo] ?? e.tipo,
+              'Data de Início': formatDateTime(e.data_inicio),
+              'Data de Término': formatDateTime(e.data_termino),
+              Descrição: e.descricao ?? '',
+            }));
+          break;
+
+        case 'tickets':
+          rows = tickets
+            .filter(t => !filters.status || t.status === filters.status)
+            .filter(t => !filters.supervisorId || t.supervisor_id === filters.supervisorId)
+            .filter(t => inRange(t.criado_em))
+            .map(t => ({
+              ID: t.id,
+              Problema: t.problema,
+              Status: TICKET_STATUS_LABELS[t.status] ?? t.status,
+              Supervisor: users.find(u => u.id === t.supervisor_id)?.nome ?? '',
+              Empresa: companies.find(c => c.id === t.empresa_id)?.nome ?? '',
+              Setor: sectors.find(s => s.id === t.setor_id)?.nome ?? '',
+              Tipo: ticketTypes.find(tt => tt.id === t.tipo_id)?.nome ?? '',
+              Subtipo: ticketSubtypes.find(s => s.id === t.subtipo_id)?.nome ?? '',
+              'Posição do Operador': t.posicao_operador ?? '',
+              'ID de Acesso': t.id_acesso ?? '',
+              'Data de Criação': formatDateTime(t.criado_em),
+            }));
+          break;
+
+        case 'users':
+          rows = users.map(u => ({
+            ID: u.id,
+            Nome: u.nome,
+            Usuário: u.nome_usuario,
+            Email: u.email,
+            Função: ROLE_LABELS[u.funcao] ?? u.funcao,
+            Empresa: companies.find(c => c.id === u.empresa_id)?.nome ?? '',
+            Setor: sectors.find(s => s.id === u.setor_id)?.nome ?? '',
+            'Data de Criação': formatDate(u.criado_em),
+          }));
+          break;
       }
-
-      const { error } = await supabase
-        .from('empresas')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setCompanies(prev => prev.filter(comp => comp.id !== id));
-      toast.success('Empresa excluída com sucesso!');
-    } catch (error) {
-      console.error('Erro ao excluir empresa:', error);
-      toast.error('Erro ao excluir empresa');
-    }
-  };
-
-  // Sector operations
-  const addSector = async (sectorData: Omit<Sector, 'id' | 'criado_em'>) => {
-    try {
-      const { data, error } = await supabase
-        .from('setores')
-        .insert(sectorData)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setSectors(prev => [...prev, data]);
-      toast.success('Setor adicionado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao adicionar setor:', error);
-      toast.error('Erro ao adicionar setor');
-    }
-  };
-
-  const updateSector = async (id: number, sectorData: Partial<Sector>) => {
-    try {
-      const { data, error } = await supabase
-        .from('setores')
-        .update(sectorData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setSectors(prev => 
-        prev.map(sect => sect.id === id ? { ...sect, ...data } : sect)
-      );
-      toast.success('Setor atualizado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao atualizar setor:', error);
-      toast.error('Erro ao atualizar setor');
-    }
-  };
-
-  const deleteSector = async (id: number) => {
-    try {
-      const { error } = await supabase
-        .from('setores')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setSectors(prev => prev.filter(sect => sect.id !== id));
-      toast.success('Setor excluído com sucesso!');
-    } catch (error) {
-      console.error('Erro ao excluir setor:', error);
-      toast.error('Erro ao excluir setor');
-    }
-  };
-
-  // User operations
-  const addUser = async (userData: Omit<User, 'id' | 'criado_em'>) => {
-    try {
-      const { data, error } = await supabase
-        .from('usuarios')
-        .insert(userData)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setUsers(prev => [...prev, data]);
-      toast.success('Usuário adicionado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao adicionar usuário:', error);
-      toast.error('Erro ao adicionar usuário');
-    }
-  };
-
-  const updateUser = async (id: number, userData: Partial<User>) => {
-    try {
-      const { data, error } = await supabase
-        .from('usuarios')
-        .update(userData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setUsers(prev => 
-        prev.map(user => user.id === id ? { ...user, ...data } : user)
-      );
-      toast.success('Usuário atualizado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao atualizar usuário:', error);
-      toast.error('Erro ao atualizar usuário');
-    }
-  };
-
-  const deleteUser = async (id: number) => {
-    try {
-      // Verificar se é o último admin
-      const { data: adminUsers } = await supabase
-        .from('usuarios')
-        .select('id')
-        .eq('funcao', 'administrador');
-
-      const targetUser = users.find(user => user.id === id);
-      
-      if (adminUsers && adminUsers.length === 1 && targetUser?.funcao === 'administrador') {
-        toast.error('Não é possível excluir o último usuário administrador.');
-        return;
-      }
-
-      const { error } = await supabase
-        .from('usuarios')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setUsers(prev => prev.filter(user => user.id !== id));
-      toast.success('Usuário excluído com sucesso!');
-    } catch (error) {
-      console.error('Erro ao excluir usuário:', error);
-      toast.error('Erro ao excluir usuário');
-    }
-  };
-
-  // Calendar operations
-  const addEvent = async (eventData: Omit<CalendarEvent, 'id' | 'criado_em'>) => {
-    try {
-      const { data, error } = await supabase
-        .from('eventos_calendario')
-        .insert(eventData)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setEvents(prev => [...prev, data]);
-      toast.success('Evento adicionado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao adicionar evento:', error);
-      toast.error('Erro ao adicionar evento');
-    }
-  };
-
-  const updateEvent = async (id: number, eventData: Partial<CalendarEvent>) => {
-    try {
-      const { data, error } = await supabase
-        .from('eventos_calendario')
-        .update(eventData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setEvents(prev => 
-        prev.map(event => event.id === id ? { ...event, ...data } : event)
-      );
-      toast.success('Evento atualizado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao atualizar evento:', error);
-      toast.error('Erro ao atualizar evento');
-    }
-  };
-
-  const deleteEvent = async (id: number) => {
-    try {
-      const { error } = await supabase
-        .from('eventos_calendario')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setEvents(prev => prev.filter(event => event.id !== id));
-      toast.success('Evento excluído com sucesso!');
-    } catch (error) {
-      console.error('Erro ao excluir evento:', error);
-      toast.error('Erro ao excluir evento');
-    }
-  };
-
-  // Note operations
-  const addNote = async (noteData: Omit<Note, 'id' | 'criado_em'>) => {
-    try {
-      const { data, error } = await supabase
-        .from('anotacoes')
-        .insert(noteData)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setNotes(prev => [...prev, data]);
-      toast.success('Anotação criada com sucesso!');
-    } catch (error) {
-      console.error('Erro ao criar anotação:', error);
-      toast.error('Erro ao criar anotação');
-    }
-  };
-
-  const updateNote = async (id: number, noteData: Partial<Note>) => {
-    try {
-      const { data, error } = await supabase
-        .from('anotacoes')
-        .update(noteData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setNotes(prev => 
-        prev.map(note => note.id === id ? { ...note, ...data } : note)
-      );
-      toast.success('Anotação atualizada com sucesso!');
-    } catch (error) {
-      console.error('Erro ao atualizar anotação:', error);
-      toast.error('Erro ao atualizar anotação');
-    }
-  };
-
-  const deleteNote = async (id: number) => {
-    try {
-      const { error } = await supabase
-        .from('anotacoes')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setNotes(prev => prev.filter(note => note.id !== id));
-      toast.success('Anotação excluída com sucesso!');
-    } catch (error) {
-      console.error('Erro ao excluir anotação:', error);
-      toast.error('Erro ao excluir anotação');
-    }
-  };
-
-  // Password operations
-  const addPassword = async (passwordData: Omit<PasswordEntry, 'id' | 'criado_em'>) => {
-    try {
-      const { data, error } = await supabase
-        .from('senhas')
-        .insert(passwordData)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setPasswords(prev => [...prev, data]);
-      toast.success('Senha adicionada com sucesso!');
-    } catch (error) {
-      console.error('Erro ao adicionar senha:', error);
-      toast.error('Erro ao adicionar senha');
-    }
-  };
-
-  const updatePassword = async (id: number, passwordData: Partial<PasswordEntry>) => {
-    try {
-      const { data, error } = await supabase
-        .from('senhas')
-        .update(passwordData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setPasswords(prev => 
-        prev.map(pass => pass.id === id ? { ...pass, ...data } : pass)
-      );
-      toast.success('Senha atualizada com sucesso!');
-    } catch (error) {
-      console.error('Erro ao atualizar senha:', error);
-      toast.error('Erro ao atualizar senha');
-    }
-  };
-
-  const deletePassword = async (id: number) => {
-    try {
-      const { error } = await supabase
-        .from('senhas')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setPasswords(prev => prev.filter(pass => pass.id !== id));
-      toast.success('Senha excluída com sucesso!');
-    } catch (error) {
-      console.error('Erro ao excluir senha:', error);
-      toast.error('Erro ao excluir senha');
-    }
-  };
-
-  // Ticket operations
-  const addTicket = async (ticketData: Omit<Ticket, 'id' | 'criado_em'>) => {
-    try {
-      const { data, error } = await supabase
-        .from('chamados')
-        .insert(ticketData)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setTickets(prev => [...prev, data]);
-      toast.success('Chamado criado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao criar chamado:', error);
-      toast.error('Erro ao criar chamado');
-    }
-  };
-
-  const updateTicket = async (id: number, ticketData: Partial<Ticket>) => {
-    try {
-      const { data, error } = await supabase
-        .from('chamados')
-        .update(ticketData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setTickets(prev => 
-        prev.map(ticket => ticket.id === id ? { ...ticket, ...data } : ticket)
-      );
-      toast.success('Chamado atualizado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao atualizar chamado:', error);
-      toast.error('Erro ao atualizar chamado');
-    }
-  };
-
-  const deleteTicket = async (id: number) => {
-    try {
-      const { error } = await supabase
-        .from('chamados')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setTickets(prev => prev.filter(ticket => ticket.id !== id));
-      toast.success('Chamado excluído com sucesso!');
-    } catch (error) {
-      console.error('Erro ao excluir chamado:', error);
-      toast.error('Erro ao excluir chamado');
-    }
-  };
-
-  // Ticket Type operations
-  const addTicketType = async (typeData: Omit<TicketType, 'id'>) => {
-    try {
-      const { data, error } = await supabase
-        .from('chamados_tipos')
-        .insert(typeData)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setTicketTypes(prev => [...prev, data]);
-      toast.success('Tipo de chamado adicionado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao adicionar tipo de chamado:', error);
-      toast.error('Erro ao adicionar tipo de chamado');
-    }
-  };
-
-  const updateTicketType = async (id: number, typeData: Partial<TicketType>) => {
-    try {
-      const { data, error } = await supabase
-        .from('chamados_tipos')
-        .update(typeData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setTicketTypes(prev => 
-        prev.map(type => type.id === id ? { ...type, ...data } : type)
-      );
-      toast.success('Tipo de chamado atualizado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao atualizar tipo de chamado:', error);
-      toast.error('Erro ao atualizar tipo de chamado');
-    }
-  };
-
-  const deleteTicketType = async (id: number) => {
-    try {
-      const { error } = await supabase
-        .from('chamados_tipos')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setTicketTypes(prev => prev.filter(type => type.id !== id));
-      toast.success('Tipo de chamado excluído com sucesso!');
-    } catch (error) {
-      console.error('Erro ao excluir tipo de chamado:', error);
-      toast.error('Erro ao excluir tipo de chamado');
-    }
-  };
-
-  // Ticket Subtype operations
-  const addTicketSubtype = async (subtypeData: Omit<TicketSubtype, 'id'>) => {
-    try {
-      const { data, error } = await supabase
-        .from('chamados_subtipos')
-        .insert(subtypeData)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setTicketSubtypes(prev => [...prev, data]);
-      toast.success('Subtipo de chamado adicionado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao adicionar subtipo de chamado:', error);
-      toast.error('Erro ao adicionar subtipo de chamado');
-    }
-  };
-
-  const updateTicketSubtype = async (id: number, subtypeData: Partial<TicketSubtype>) => {
-    try {
-      const { data, error } = await supabase
-        .from('chamados_subtipos')
-        .update(subtypeData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setTicketSubtypes(prev => 
-        prev.map(subtype => subtype.id === id ? { ...subtype, ...data } : subtype)
-      );
-      toast.success('Subtipo de chamado atualizado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao atualizar subtipo de chamado:', error);
-      toast.error('Erro ao atualizar subtipo de chamado');
-    }
-  };
-
-  const deleteTicketSubtype = async (id: number) => {
-    try {
-      const { error } = await supabase
-        .from('chamados_subtipos')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setTicketSubtypes(prev => prev.filter(subtype => subtype.id !== id));
-      toast.success('Subtipo de chamado excluído com sucesso!');
-    } catch (error) {
-      console.error('Erro ao excluir subtipo de chamado:', error);
-      toast.error('Erro ao excluir subtipo de chamado');
-    }
-  };
-
-  // Reports
-  const generateReport = (type: string, filters: any) => {
-    let data: any[] = [];
-    let columns: string[] = [];
-
-    switch (type) {
-      case 'products':
-        data = products;
-        if (filters.categoryId) {
-          data = data.filter(product => product.categoria_id === filters.categoryId);
-        }
-        if (filters.status) {
-          data = data.filter(product => product.status === filters.status);
-        }
-        if (filters.lowStock) {
-          data = data.filter(product => product.quantidade <= product.quantidade_minima);
-        }
-        
-        // Enriquecer dados com nomes das categorias
-        data = data.map(product => {
-          const category = categories.find(c => c.id === product.categoria_id);
-          return {
-            ...product,
-            categoryName: category ? category.nome : 'Sem categoria'
-          };
-        });
-        
-        columns = ['ID', 'Nome', 'Categoria', 'Quantidade', 'Quantidade Mínima', 'Status', 'Data de Criação'];
-        break;
-        
-      case 'categories':
-        data = categories;
-        columns = ['ID', 'Nome', 'Descrição', 'Data de Criação'];
-        break;
-        
-      case 'events':
-        data = events;
-        if (filters.startDate) {
-          data = data.filter(event => new Date(event.data_inicio) >= new Date(filters.startDate));
-        }
-        if (filters.endDate) {
-          data = data.filter(event => new Date(event.data_inicio) <= new Date(filters.endDate));
-        }
-        if (filters.type) {
-          data = data.filter(event => event.tipo === filters.type);
-        }
-        columns = ['ID', 'Título', 'Tipo', 'Data de Início', 'Data de Término', 'Descrição'];
-        break;
-
-      case 'tickets':
-        data = tickets;
-        if (filters.status) {
-          data = data.filter(ticket => ticket.status === filters.status);
-        }
-        if (filters.startDate) {
-          data = data.filter(ticket => new Date(ticket.criado_em) >= new Date(filters.startDate));
-        }
-        if (filters.endDate) {
-          data = data.filter(ticket => new Date(ticket.criado_em) <= new Date(filters.endDate));
-        }
-        columns = ['ID', 'Problema', 'Status', 'Data de Criação'];
-        break;
-        
-      default:
-        toast.error('Tipo de relatório inválido');
-        return;
     }
 
-    generateExcel(type, data, columns);
-    toast.success('Relatório gerado com sucesso!');
+    if (rows.length === 0) {
+      toast.error('Nenhum registro encontrado para os filtros selecionados.');
+      return;
+    }
+
+    generateExcel(type, rows)
+      .then(() => toast.success(`Relatório gerado com ${rows.length} registro(s)!`))
+      .catch(error => {
+        console.error('Erro ao gerar relatório:', error);
+        toast.error('Erro ao gerar o arquivo do relatório.');
+      });
   };
 
   return (
     <DataContext.Provider
       value={{
         loading,
-        
+        refreshData: loadData,
+
         categories,
-        addCategory,
-        updateCategory,
+        addCategory: categoryOps.add,
+        updateCategory: categoryOps.update,
         deleteCategory,
-        
+
         products,
         addProduct,
         updateProduct,
-        deleteProduct,
+        deleteProduct: productOps.remove,
         getLowStockProducts,
         adjustProductQuantity,
-        
+
         events,
-        addEvent,
-        updateEvent,
-        deleteEvent,
-        
+        addEvent: eventOps.add,
+        updateEvent: eventOps.update,
+        deleteEvent: eventOps.remove,
+
         users,
-        addUser,
+        addUser: userOps.add,
         updateUser,
         deleteUser,
-        
+
         companies,
-        addCompany,
-        updateCompany,
+        addCompany: companyOps.add,
+        updateCompany: companyOps.update,
         deleteCompany,
-        
+
         sectors,
-        addSector,
-        updateSector,
+        addSector: sectorOps.add,
+        updateSector: sectorOps.update,
         deleteSector,
-        
+
         notes,
-        addNote,
-        updateNote,
-        deleteNote,
-        
+        addNote: noteOps.add,
+        updateNote: noteOps.update,
+        deleteNote: noteOps.remove,
+
         passwords,
-        addPassword,
-        updatePassword,
-        deletePassword,
+        addPassword: passwordOps.add,
+        updatePassword: passwordOps.update,
+        deletePassword: passwordOps.remove,
 
         tickets,
-        addTicket,
-        updateTicket,
-        deleteTicket,
-        
+        addTicket: ticketOps.add,
+        updateTicket: ticketOps.update,
+        deleteTicket: ticketOps.remove,
+
         ticketTypes,
-        addTicketType,
-        updateTicketType,
+        addTicketType: typeOps.add,
+        updateTicketType: typeOps.update,
         deleteTicketType,
-        
+
         ticketSubtypes,
-        addTicketSubtype,
-        updateTicketSubtype,
-        deleteTicketSubtype,
-        
+        addTicketSubtype: subtypeOps.add,
+        updateTicketSubtype: subtypeOps.update,
+        deleteTicketSubtype: subtypeOps.remove,
+
         generateReport,
-        refreshData
       }}
     >
       {children}
