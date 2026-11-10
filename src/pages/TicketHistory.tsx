@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
-import { ClipboardList, Filter, FileText, Calendar, User, Building2, CheckCircle } from 'lucide-react';
+import { formatDateTime } from '../utils/excelUtils';
+import { TICKET_STATUS_LABELS } from '../types';
+import { ClipboardList, Filter, FileText, Calendar, User, CheckCircle } from 'lucide-react';
 
 const TicketHistory = () => {
   const { tickets, users, companies, sectors, ticketTypes, ticketSubtypes, generateReport } = useData();
@@ -26,18 +28,15 @@ const TicketHistory = () => {
     );
   }
 
-  // Filter tickets (resolved and closed)
-  const resolvedTickets = tickets.filter(ticket => 
-    ticket.status === 'resolvido' || ticket.status === 'fechado'
-  );
+  const resolvedTickets = tickets.filter(ticket => ticket.status === 'resolvido');
 
-  const filteredTickets = resolvedTickets.filter(ticket => {
+  const filteredTickets = tickets.filter(ticket => {
     if (filterStatus && ticket.status !== filterStatus) return false;
     if (filterType && ticket.tipo_id?.toString() !== filterType) return false;
     if (filterSector && ticket.setor_id?.toString() !== filterSector) return false;
     if (filterUser && ticket.supervisor_id?.toString() !== filterUser) return false;
-    if (filterStartDate && new Date(ticket.criado_em) < new Date(filterStartDate)) return false;
-    if (filterEndDate && new Date(ticket.criado_em) > new Date(filterEndDate)) return false;
+    if (filterStartDate && new Date(ticket.criado_em) < new Date(`${filterStartDate}T00:00:00`)) return false;
+    if (filterEndDate && new Date(ticket.criado_em) > new Date(`${filterEndDate}T23:59:59`)) return false;
     return true;
   });
 
@@ -56,29 +55,33 @@ const TicketHistory = () => {
     return sector ? sector.nome : 'Setor não encontrado';
   };
 
-  const getTypeName = (typeId?: number) => {
+  const getTypeName = (typeId: number | null) => {
     if (!typeId) return '-';
     const type = ticketTypes.find(t => t.id === typeId);
     return type ? type.nome : 'Tipo não encontrado';
   };
 
-  const getSubtypeName = (subtypeId?: number) => {
+  const getSubtypeName = (subtypeId: number | null) => {
     if (!subtypeId) return '-';
     const subtype = ticketSubtypes.find(st => st.id === subtypeId);
     return subtype ? subtype.nome : 'Subtipo não encontrado';
   };
 
+  // Exporta exatamente o que está filtrado na tela
   const generateHistoryReport = () => {
-    const filters = {
-      status: filterStatus,
-      type: filterType,
-      sector: filterSector,
-      user: filterUser,
-      startDate: filterStartDate,
-      endDate: filterEndDate
-    };
-    
-    generateReport('ticketHistory', filters);
+    generateReport('tickets', {}, filteredTickets.map(ticket => ({
+      ID: ticket.id,
+      Problema: ticket.problema,
+      Status: TICKET_STATUS_LABELS[ticket.status] ?? ticket.status,
+      Supervisor: getUserName(ticket.supervisor_id),
+      Empresa: getCompanyName(ticket.empresa_id),
+      Setor: getSectorName(ticket.setor_id),
+      Tipo: getTypeName(ticket.tipo_id),
+      Subtipo: getSubtypeName(ticket.subtipo_id),
+      'Posição do Operador': ticket.posicao_operador ?? '',
+      'ID de Acesso': ticket.id_acesso ?? '',
+      'Data de Criação': formatDateTime(ticket.criado_em),
+    })));
   };
 
   return (
@@ -90,7 +93,7 @@ const TicketHistory = () => {
             Histórico de Chamados
           </h1>
           <p className="mt-1 text-sm text-gray-600">
-            Visualize todos os chamados resolvidos e fechados do sistema
+            Consulte e exporte o histórico completo de chamados do sistema
           </p>
         </div>
         <button
@@ -115,8 +118,9 @@ const TicketHistory = () => {
               className="block w-full rounded-md border border-gray-300 py-2 px-3 text-sm"
             >
               <option value="">Todos</option>
+              <option value="aberto">Aberto</option>
+              <option value="em_andamento">Em Andamento</option>
               <option value="resolvido">Resolvido</option>
-              <option value="fechado">Fechado</option>
             </select>
           </div>
 
@@ -237,9 +241,9 @@ const TicketHistory = () => {
               <Calendar className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-600">Este Mês</p>
+              <p className="text-sm font-medium text-gray-600">Abertos este mês</p>
               <p className="text-2xl font-bold text-gray-900">
-                {resolvedTickets.filter(ticket => {
+                {tickets.filter(ticket => {
                   const ticketDate = new Date(ticket.criado_em);
                   const now = new Date();
                   return ticketDate.getMonth() === now.getMonth() && 
@@ -326,11 +330,13 @@ const TicketHistory = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      ticket.status === 'resolvido' 
-                        ? 'bg-blue-100 text-blue-800' 
-                        : 'bg-green-100 text-green-800'
+                      ticket.status === 'resolvido'
+                        ? 'bg-green-100 text-green-800'
+                        : ticket.status === 'em_andamento'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-red-100 text-red-800'
                     }`}>
-                      {ticket.status === 'resolvido' ? 'Resolvido' : 'Fechado'}
+                      {TICKET_STATUS_LABELS[ticket.status] ?? ticket.status}
                     </span>
                   </td>
                 </tr>
@@ -344,8 +350,8 @@ const TicketHistory = () => {
             <ClipboardList className="w-12 h-12 mx-auto text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum chamado encontrado</h3>
             <p className="text-gray-500">
-              {resolvedTickets.length === 0 
-                ? 'Ainda não há chamados resolvidos no sistema.'
+              {tickets.length === 0
+                ? 'Ainda não há chamados no sistema.'
                 : 'Tente ajustar os filtros de busca.'
               }
             </p>

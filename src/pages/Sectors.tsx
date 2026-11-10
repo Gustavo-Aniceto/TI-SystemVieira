@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useData } from '../contexts/DataContext';
 import { Building2, Plus, Edit, Trash2, X } from 'lucide-react';
+import toast from 'react-hot-toast';
+import type { Sector } from '../types';
 
 interface SectorFormData {
   nome: string;
@@ -42,7 +44,7 @@ const Sectors = () => {
     setIsModalOpen(true);
   };
   
-  const openEditModal = (sector: any) => {
+  const openEditModal = (sector: Sector) => {
     setFormData({
       nome: sector.nome,
       empresa_id: sector.empresa_id
@@ -65,16 +67,19 @@ const Sectors = () => {
     }));
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (modalMode === 'add') {
-      addSector(formData);
-    } else if (modalMode === 'edit' && currentSector) {
-      updateSector(parseInt(currentSector), formData);
+    if (!companies.some(c => c.id === formData.empresa_id)) {
+      toast.error('Selecione uma empresa. Cadastre uma em Configurações > Empresas, se necessário.');
+      return;
     }
-    
-    closeModal();
+    const payload = { nome: formData.nome.trim(), empresa_id: formData.empresa_id };
+
+    const ok = modalMode === 'add'
+      ? await addSector(payload)
+      : currentSector !== null && await updateSector(parseInt(currentSector), payload);
+
+    if (ok) closeModal();
   };
   
   const handleDelete = (id: string) => {

@@ -1,200 +1,155 @@
+// Tipos de domínio alinhados ao schema do Supabase (ver supabase/migrations)
+
+export type UserRole = 'usuario' | 'administrador' | 'supervisor' | 'estagiario';
+
 export interface User {
-  id: string;
-  username: string;
-  password: string;
-  name: string;
-  role: 'admin' | 'user' | 'intern' | 'supervisor';
+  id: number;
+  nome: string;
+  nome_usuario: string;
   email: string;
-  companyId?: string;
-  department?: string;
-  createdAt: string;
+  senha: string;
+  funcao: UserRole;
+  empresa_id: number | null;
+  setor_id: number | null;
+  criado_em: string;
 }
 
 export interface Company {
-  id: string;
-  name: string;
-  description?: string;
-  departments: string[];
-  createdAt: string;
+  id: number;
+  nome: string;
+  descricao: string | null;
+  criado_em: string;
+}
+
+export interface Sector {
+  id: number;
+  nome: string;
+  empresa_id: number;
+  criado_em: string;
 }
 
 export interface Category {
-  id: string;
-  name: string;
-  description: string;
-  createdAt: string;
+  id: number;
+  nome: string;
+  descricao: string | null;
+  criado_em: string;
 }
+
+export type ProductStatus = 'ativo' | 'inativo' | 'em_manutencao';
 
 export interface Product {
-  id: string;
-  name: string;
-  description: string;
-  categoryId: string;
-  quantity: number;
-  minQuantity: number;
-  status: 'active' | 'inactive' | 'maintenance';
-  serialNumber?: string;
-  location?: string;
-  department?: string;
-  branch?: string;
-  purchaseDate?: string;
-  warrantyEnd?: string;
-  lifecycleStatus: 'new' | 'in-use' | 'maintenance' | 'disposed';
-  notes?: string;
-  createdAt: string;
-  maintenanceHistory: MaintenanceRecord[];
-  movementHistory: MovementRecord[];
-  licenseExpiration?: string;
+  id: number;
+  nome: string;
+  descricao: string | null;
+  categoria_id: number;
+  status: ProductStatus;
+  quantidade: number;
+  quantidade_minima: number;
+  numero_serie: string | null;
+  localizacao: string | null;
+  data_compra: string | null;
+  fim_garantia: string | null;
+  notas: string | null;
+  criado_em: string;
 }
 
-export interface MaintenanceRecord {
-  id: string;
-  date: string;
-  description: string;
-  cost?: number;
-  provider?: string;
-  status: 'completed' | 'pending' | 'scheduled';
-  notes?: string;
-  createdBy: string;
-  createdAt: string;
-}
-
-export interface MovementRecord {
-  id: string;
-  date: string;
-  type: 'check-out' | 'check-in' | 'transfer';
-  userId: string;
-  fromLocation?: string;
-  toLocation?: string;
-  reason?: string;
-  expectedReturnDate?: string;
-  notes?: string;
-  createdAt: string;
-}
+export type EventType = 'assinatura' | 'tarefa' | 'lembrete';
 
 export interface CalendarEvent {
-  id: string;
-  title: string;
-  description: string;
-  startDate: string;
-  endDate: string;
-  type: 'subscription' | 'task' | 'reminder' | 'maintenance' | 'license';
-  relatedProductId?: string;
-  color?: string;
-  createdAt: string;
-}
-
-export interface InternActivity {
-  id: string;
-  internId: string;
-  startDate: string;
-  endDate?: string;
-  description: string;
-  category: 'maintenance' | 'support' | 'inventory' | 'other';
-  duration?: number; // in minutes
-  status: 'in-progress' | 'completed' | 'pending-review' | 'approved' | 'rejected';
-  feedback?: string;
-  rejectionReason?: string;
-  createdAt: string;
-  completedAt?: string;
-  submittedAt?: string;
-  reviewedAt?: string;
+  id: number;
+  titulo: string;
+  descricao: string | null;
+  tipo: EventType;
+  data_inicio: string;
+  data_termino: string;
+  cor: string | null;
+  criado_em: string;
 }
 
 export interface Note {
-  id: string;
-  title: string;
-  content: string;
-  type: 'note' | 'checklist';
-  color?: string;
-  isPublic: boolean;
-  userId: string;
-  checklistItems?: ChecklistItem[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ChecklistItem {
-  id: string;
-  text: string;
-  completed: boolean;
-  createdAt: string;
+  id: number;
+  titulo: string;
+  conteudo: string;
+  cor_fundo: string | null;
+  tornar_publico: boolean;
+  criado_por: number | null;
+  criado_em: string;
 }
 
 export interface PasswordEntry {
-  id: string;
-  title: string;
-  username: string;
-  password: string;
-  website?: string;
-  notes?: string;
-  category: 'work' | 'personal' | 'social' | 'financial' | 'other';
-  userId: string;
-  createdAt: string;
-  updatedAt: string;
+  id: number;
+  sistema: string;
+  usuario_acesso: string;
+  senha_criptografada: string;
+  categoria: string | null;
+  observacoes: string | null;
+  criado_por: number | null;
+  criado_em: string;
 }
 
-export interface TicketAttachment {
-  id: string;
-  name: string;
-  size: number;
-  type: string;
-  data: string; // base64 encoded file data
-  uploadedAt: string;
-}
-
-export interface TicketTransfer {
-  id: string;
-  fromUserId: string;
-  toUserId: string;
-  reason: string;
-  status: 'pending' | 'accepted' | 'rejected';
-  transferredAt: string;
-  respondedAt?: string;
-}
+export type TicketStatus = 'aberto' | 'em_andamento' | 'resolvido';
 
 export interface Ticket {
-  id: string;
-  problem: string;
-  supervisor: string;
-  operator: string;
-  company: string;
-  anydeskAccess: string;
-  status: 'open' | 'in-progress' | 'resolved' | 'closed';
-  createdBy: string;
-  assignedTo?: string;
-  attendedBy?: string;
-  attendedAt?: string;
-  responseTime?: number; // in minutes
-  closedAt?: string;
-  closingFeedback?: string;
-  attachments: TicketAttachment[];
-  transfers: TicketTransfer[];
-  comments: TicketComment[];
-  createdAt: string;
-  updatedAt: string;
+  id: number;
+  problema: string;
+  supervisor_id: number;
+  posicao_operador: string | null;
+  empresa_id: number;
+  setor_id: number;
+  id_acesso: string | null;
+  anexo: string | null;
+  status: TicketStatus;
+  criado_em: string;
+  tipo_id: number | null;
+  subtipo_id: number | null;
 }
 
-export interface TicketComment {
-  id: string;
-  ticketId: string;
-  userId: string;
-  content: string;
-  createdAt: string;
+export interface TicketType {
+  id: number;
+  nome: string;
 }
 
-export interface ReportFilter {
-  categoryId?: string;
+export interface TicketSubtype {
+  id: number;
+  tipo_id: number;
+  nome: string;
+}
+
+/** Campos gerados pelo banco que não são enviados em inserts. */
+export type NewRecord<T> = Omit<T, 'id' | 'criado_em'>;
+
+export interface ReportFilters {
+  categoryId?: number;
   status?: string;
   lowStock?: boolean;
   startDate?: string;
   endDate?: string;
   type?: string;
-  location?: string;
-  department?: string;
-  branch?: string;
-  lifecycleStatus?: string;
-  internId?: string;
-  activityCategory?: string;
-  activityStatus?: string;
+  supervisorId?: number;
 }
+
+// Rótulos de exibição
+export const ROLE_LABELS: Record<UserRole, string> = {
+  administrador: 'Administrador',
+  usuario: 'Usuário',
+  supervisor: 'Supervisor',
+  estagiario: 'Estagiário',
+};
+
+export const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {
+  ativo: 'Ativo',
+  inativo: 'Inativo',
+  em_manutencao: 'Em manutenção',
+};
+
+export const EVENT_TYPE_LABELS: Record<EventType, string> = {
+  assinatura: 'Assinatura',
+  tarefa: 'Tarefa',
+  lembrete: 'Lembrete',
+};
+
+export const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
+  aberto: 'Aberto',
+  em_andamento: 'Em andamento',
+  resolvido: 'Resolvido',
+};

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useData } from '../contexts/DataContext';
 import { Ticket, Plus, Edit, Trash2, X, ChevronDown, ChevronRight } from 'lucide-react';
+import type { TicketType, TicketSubtype } from '../types';
 
 interface TicketTypeFormData {
   nome: string;
@@ -52,7 +53,7 @@ const TicketTypes = () => {
     setIsTypeModalOpen(true);
   };
   
-  const openEditTypeModal = (type: any) => {
+  const openEditTypeModal = (type: TicketType) => {
     setTypeFormData({ nome: type.nome });
     setCurrentType(type.id.toString());
     setTypeModalMode('edit');
@@ -66,7 +67,7 @@ const TicketTypes = () => {
     setIsSubtypeModalOpen(true);
   };
   
-  const openEditSubtypeModal = (subtype: any) => {
+  const openEditSubtypeModal = (subtype: TicketSubtype) => {
     setSubtypeFormData({ nome: subtype.nome, tipo_id: subtype.tipo_id });
     setCurrentSubtype(subtype.id.toString());
     setSubtypeModalMode('edit');

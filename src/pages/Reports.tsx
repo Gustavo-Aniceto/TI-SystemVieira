@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import { useData } from '../contexts/DataContext';
+import toast from 'react-hot-toast';
+import { useData, ReportType } from '../contexts/DataContext';
+import type { ReportFilters } from '../types';
 import { FileText, Download } from 'lucide-react';
 
 interface ReportFormData {
-  type: string;
+  type: ReportType;
   categoryId?: string;
   status?: string;
   lowStock?: boolean;
   startDate?: string;
   endDate?: string;
   eventType?: string;
-  createdBy?: string;
-  attendedBy?: string;
+  supervisorId?: string;
 }
 
 const Reports = () => {
@@ -19,30 +20,38 @@ const Reports = () => {
   const [formData, setFormData] = useState<ReportFormData>({
     type: 'products'
   });
-  
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    
+
     if (type === 'checkbox') {
       const checkboxInput = e.target as HTMLInputElement;
       setFormData(prev => ({ ...prev, [name]: checkboxInput.checked }));
+    } else if (name === 'type') {
+      // Filtros de um tipo de relatório não valem para outro
+      setFormData({ type: value as ReportType });
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
   };
-  
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const filters: any = {};
-    
+
+    if (formData.startDate && formData.endDate && formData.endDate < formData.startDate) {
+      toast.error('A data final deve ser igual ou posterior à data inicial.');
+      return;
+    }
+
+    const filters: ReportFilters = {};
+
     switch (formData.type) {
       case 'products':
-        if (formData.categoryId) filters.categoryId = formData.categoryId;
+        if (formData.categoryId) filters.categoryId = Number(formData.categoryId);
         if (formData.status) filters.status = formData.status;
         if (formData.lowStock) filters.lowStock = true;
         break;
-        
+
       case 'events':
         if (formData.startDate) filters.startDate = formData.startDate;
         if (formData.endDate) filters.endDate = formData.endDate;
@@ -51,13 +60,12 @@ const Reports = () => {
 
       case 'tickets':
         if (formData.status) filters.status = formData.status;
-        if (formData.createdBy) filters.createdBy = formData.createdBy;
-        if (formData.attendedBy) filters.attendedBy = formData.attendedBy;
+        if (formData.supervisorId) filters.supervisorId = Number(formData.supervisorId);
         if (formData.startDate) filters.startDate = formData.startDate;
         if (formData.endDate) filters.endDate = formData.endDate;
         break;
     }
-    
+
     generateReport(formData.type, filters);
   };
 
@@ -93,6 +101,7 @@ const Reports = () => {
                 <option value="categories">Categorias</option>
                 <option value="events">Eventos</option>
                 <option value="tickets">Chamados</option>
+                <option value="users">Usuários</option>
               </select>
             </div>
             
@@ -112,7 +121,7 @@ const Reports = () => {
                     <option value="">Todas as categorias</option>
                     {categories.map((category) => (
                       <option key={category.id} value={category.id}>
-                        {category.name}
+                        {category.nome}
                       </option>
                     ))}
                   </select>
@@ -130,9 +139,9 @@ const Reports = () => {
                     className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
                     <option value="">Todos os status</option>
-                    <option value="active">Ativo</option>
-                    <option value="inactive">Inativo</option>
-                    <option value="maintenance">Em Manutenção</option>
+                    <option value="ativo">Ativo</option>
+                    <option value="inativo">Inativo</option>
+                    <option value="em_manutencao">Em Manutenção</option>
                   </select>
                 </div>
                 
@@ -197,9 +206,9 @@ const Reports = () => {
                     className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
                     <option value="">Todos os tipos</option>
-                    <option value="subscription">Assinatura</option>
-                    <option value="task">Tarefa</option>
-                    <option value="reminder">Lembrete</option>
+                    <option value="assinatura">Assinatura</option>
+                    <option value="tarefa">Tarefa</option>
+                    <option value="lembrete">Lembrete</option>
                   </select>
                 </div>
               </div>
@@ -219,53 +228,30 @@ const Reports = () => {
                     className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
                     <option value="">Todos os status</option>
-                    <option value="open">Aberto</option>
-                    <option value="in-progress">Em Andamento</option>
-                    <option value="resolved">Resolvido</option>
-                    <option value="closed">Fechado</option>
+                    <option value="aberto">Aberto</option>
+                    <option value="em_andamento">Em Andamento</option>
+                    <option value="resolvido">Resolvido</option>
                   </select>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="createdBy" className="block text-sm font-medium text-gray-700 mb-1">
-                      Criado por
-                    </label>
-                    <select
-                      id="createdBy"
-                      name="createdBy"
-                      value={formData.createdBy || ''}
-                      onChange={handleChange}
-                      className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="">Todos os usuários</option>
-                      {users.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label htmlFor="attendedBy" className="block text-sm font-medium text-gray-700 mb-1">
-                      Atendido por
-                    </label>
-                    <select
-                      id="attendedBy"
-                      name="attendedBy"
-                      value={formData.attendedBy || ''}
-                      onChange={handleChange}
-                      className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="">Todos os atendentes</option>
-                      {users.filter(u => u.role !== 'supervisor').map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <div>
+                  <label htmlFor="supervisorId" className="block text-sm font-medium text-gray-700 mb-1">
+                    Supervisor
+                  </label>
+                  <select
+                    id="supervisorId"
+                    name="supervisorId"
+                    value={formData.supervisorId || ''}
+                    onChange={handleChange}
+                    className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="">Todos os supervisores</option>
+                    {users.filter(u => u.funcao === 'supervisor').map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.nome}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { useData } from '../contexts/DataContext';
+import { useData, AppUser } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Users as UsersIcon, Plus, Edit, Trash2, X, ShieldAlert } from 'lucide-react';
+import { Plus, Edit, Trash2, X, ShieldAlert } from 'lucide-react';
+import type { UserRole } from '../types';
 
 interface UserFormData {
   nome_usuario: string;
-  password: string;
+  senha: string;
   nome: string;
   email: string;
-  funcao: 'usuario' | 'administrador' | 'supervisor' | 'estagiario';
-  empresa_id: number;
-  setor_id?: number;
+  funcao: UserRole;
+  empresa_id: string;
+  setor_id: string;
 }
 
 const Users = () => {
@@ -18,88 +19,84 @@ const Users = () => {
   const { user: currentUser } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<UserFormData>({
-    username: '',
-    password: '',
-    name: '',
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const emptyForm = (): UserFormData => ({
+    nome_usuario: '',
+    senha: '',
+    nome: '',
     email: '',
-    role: 'user',
-    companyId: '',
-    department: ''
+    funcao: 'usuario',
+    empresa_id: companies.length > 0 ? String(companies[0].id) : '',
+    setor_id: '',
   });
-  
+  const [formData, setFormData] = useState<UserFormData>(emptyForm);
+
   const resetForm = () => {
-    setFormData({
-      nome_usuario: '',
-      password: '',
-      nome: '',
-      email: '',
-      funcao: 'usuario',
-      empresa_id: companies.length > 0 ? companies[0].id : 1,
-      setor_id: undefined
-    });
+    setFormData(emptyForm());
     setCurrentUserId(null);
   };
-  
+
   const openAddModal = () => {
     resetForm();
     setModalMode('add');
     setIsModalOpen(true);
   };
-  
-  const openEditModal = (user: any) => {
+
+  const openEditModal = (user: AppUser) => {
     setFormData({
       nome_usuario: user.nome_usuario,
-      password: '', // Don't show the password, but let the user set a new one
+      senha: '', // A senha atual não é exibida; preencher define uma nova
       nome: user.nome,
       email: user.email,
       funcao: user.funcao,
-      empresa_id: user.empresa_id || 1,
-      setor_id: user.setor_id
+      empresa_id: user.empresa_id ? String(user.empresa_id) : '',
+      setor_id: user.setor_id ? String(user.setor_id) : '',
     });
-    setCurrentUserId(user.id.toString());
+    setCurrentUserId(user.id);
     setModalMode('edit');
     setIsModalOpen(true);
   };
-  
+
   const closeModal = () => {
     setIsModalOpen(false);
     resetForm();
   };
-  
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+      // Ao trocar a empresa, o setor anterior deixa de ser válido
+      ...(name === 'empresa_id' ? { setor_id: '' } : {}),
+    }));
   };
-  
-  const handleSubmit = (e: React.FormEvent) => {
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (modalMode === 'add') {
-      addUser(formData);
-    } else if (modalMode === 'edit' && currentUserId) {
-      // If password is empty, don't update it
-      const dataToUpdate = { ...formData };
-      if (!dataToUpdate.password) {
-        const { password, ...updateData } = dataToUpdate;
-        updateUser(parseInt(currentUserId), updateData);
-      } else {
-        updateUser(parseInt(currentUserId), dataToUpdate);
-      }
-    }
-    
-    closeModal();
+
+    const payload = {
+      nome: formData.nome.trim(),
+      nome_usuario: formData.nome_usuario.trim(),
+      email: formData.email.trim(),
+      funcao: formData.funcao,
+      empresa_id: formData.empresa_id ? Number(formData.empresa_id) : null,
+      setor_id: formData.setor_id ? Number(formData.setor_id) : null,
+    };
+
+    setSaving(true);
+    const ok = modalMode === 'add'
+      ? await addUser({ ...payload, senha: formData.senha })
+      : currentUserId !== null && await updateUser(currentUserId, formData.senha ? { ...payload, senha: formData.senha } : payload);
+    setSaving(false);
+
+    if (ok) closeModal();
   };
-  
-  const handleDelete = (id: string) => {
-    if (id === currentUser?.id.toString()) {
-      alert('Você não pode excluir seu próprio usuário.');
-      return;
-    }
-    
+
+  const handleDelete = (id: number) => {
     if (window.confirm('Tem certeza que deseja excluir este usuário?')) {
-      deleteUser(parseInt(id));
+      deleteUser(id);
     }
   };
 
@@ -131,12 +128,12 @@ const Users = () => {
     }
   };
 
-  const getCompanyName = (empresa_id: number) => {
+  const getCompanyName = (empresa_id: number | null) => {
     const company = companies.find(c => c.id === empresa_id);
     return company ? company.nome : '-';
   };
 
-  const getSectorName = (setor_id?: number) => {
+  const getSectorName = (setor_id: number | null) => {
     if (!setor_id) return '-';
     const sector = sectors.find(s => s.id === setor_id);
     return sector ? sector.nome : '-';
@@ -186,11 +183,11 @@ const Users = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {users.map((user) => (
-                <tr key={user.id} className={`hover:bg-gray-50 ${user.id.toString() === currentUser?.id ? 'bg-blue-50' : ''}`}>
+                <tr key={user.id} className={`hover:bg-gray-50 ${user.id === currentUser?.id ? 'bg-blue-50' : ''}`}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="text-sm font-medium text-gray-900">{user.nome}</div>
-                      {user.id.toString() === currentUser?.id && (
+                      {user.id === currentUser?.id && (
                         <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                           Você
                         </span>
@@ -223,11 +220,11 @@ const Users = () => {
                       <Edit className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => handleDelete(user.id.toString())}
+                      onClick={() => handleDelete(user.id)}
                       className={`text-red-600 hover:text-red-900 ${
-                        user.id.toString() === currentUser?.id ? 'opacity-50 cursor-not-allowed' : ''
+                        user.id === currentUser?.id ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
-                      disabled={user.id.toString() === currentUser?.id}
+                      disabled={user.id === currentUser?.id}
                     >
                       <Trash2 className="w-5 h-5" />
                     </button>
@@ -242,7 +239,7 @@ const Users = () => {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-gray-900">
                 {modalMode === 'add' ? 'Novo Usuário' : 'Editar Usuário'}
@@ -300,14 +297,14 @@ const Users = () => {
                 </div>
                 
                 <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="senha" className="block text-sm font-medium text-gray-700 mb-1">
                     {modalMode === 'add' ? 'Senha *' : 'Nova Senha (deixe em branco para manter a atual)'}
                   </label>
                   <input
                     type="password"
-                    id="password"
-                    name="password"
-                    value={formData.password}
+                    id="senha"
+                    name="senha"
+                    value={formData.senha}
                     onChange={handleChange}
                     required={modalMode === 'add'}
                     className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -345,6 +342,7 @@ const Users = () => {
                     required
                     className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
+                    <option value="" disabled>Selecione uma empresa</option>
                     {companies.map((company) => (
                       <option key={company.id} value={company.id}>
                         {company.nome}
@@ -360,12 +358,12 @@ const Users = () => {
                   <select
                     id="setor_id"
                     name="setor_id"
-                    value={formData.setor_id || ''}
+                    value={formData.setor_id}
                     onChange={handleChange}
                     className="block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
                     <option value="">Selecione um setor</option>
-                    {sectors.filter(s => s.empresa_id === formData.empresa_id).map((sector) => (
+                    {sectors.filter(s => s.empresa_id === Number(formData.empresa_id)).map((sector) => (
                       <option key={sector.id} value={sector.id}>
                         {sector.nome}
                       </option>
@@ -384,9 +382,10 @@ const Users = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  disabled={saving}
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                 >
-                  {modalMode === 'add' ? 'Adicionar' : 'Salvar'}
+                  {saving ? 'Salvando...' : modalMode === 'add' ? 'Adicionar' : 'Salvar'}
                 </button>
               </div>
             </form>

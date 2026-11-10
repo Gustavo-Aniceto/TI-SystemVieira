@@ -20,8 +20,10 @@ import NotFound from './pages/NotFound';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DataProvider } from './contexts/DataContext';
 import LoadingSpinner from './components/LoadingSpinner';
+import { isSupabaseConfigured } from './lib/supabase';
+import type { UserRole } from './types';
 
-const ProtectedRoute = ({ children, roles }: { children: React.ReactNode, roles?: string[] }) => {
+const ProtectedRoute = ({ children, roles }: { children: React.ReactNode, roles?: UserRole[] }) => {
   const { user, loading } = useAuth();
   
   if (loading) {
@@ -120,6 +122,11 @@ const AuthenticatedApp = () => {
               <TicketTypes />
             </ProtectedRoute>
           } />
+          <Route path="ticket-history" element={
+            <ProtectedRoute roles={['administrador']}>
+              <TicketHistory />
+            </ProtectedRoute>
+          } />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Layout>
@@ -141,7 +148,28 @@ const PublicApp = () => {
   return <Login />;
 };
 
+const MissingConfig = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4">
+    <div className="max-w-lg w-full bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
+      <h1 className="text-2xl font-bold text-gray-900 mb-2">Configuração necessária</h1>
+      <p className="text-gray-600 mb-4">
+        As variáveis de ambiente do Supabase não foram encontradas. Crie um arquivo <code className="px-1 bg-gray-100 rounded">.env</code> na
+        raiz do projeto (veja <code className="px-1 bg-gray-100 rounded">.env.example</code>) com:
+      </p>
+      <pre className="bg-gray-900 text-gray-100 text-sm rounded-lg p-4 overflow-x-auto">
+{`VITE_SUPABASE_URL=https://<projeto>.supabase.co
+VITE_SUPABASE_ANON_KEY=<chave-anon>`}
+      </pre>
+      <p className="text-gray-500 text-sm mt-4">Depois reinicie o servidor de desenvolvimento.</p>
+    </div>
+  </div>
+);
+
 function App() {
+  if (!isSupabaseConfigured) {
+    return <MissingConfig />;
+  }
+
   return (
     <AuthProvider>
       <Router>
